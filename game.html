@@ -213,6 +213,49 @@
                     this.entities.airliners.push({ mesh: plane, speed: 2.5 + Math.random()*1.5, trailTimer: 0 });
                 }
 
+                // Clouds
+                for(let i=0; i<40; i++) {
+                    const cloud = new THREE.Group();
+                    const mat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity: 0.6});
+                    for(let j=0; j<4; j++) {
+                        const s = new THREE.Mesh(new THREE.SphereGeometry(80 + Math.random()*120, 6, 6), mat);
+                        s.position.set((Math.random()-0.5)*200, Math.random()*40, (Math.random()-0.5)*200);
+                        cloud.add(s);
+                    }
+                    cloud.position.set((Math.random()-0.5)*60000, 2000 + Math.random()*3000, (Math.random()-0.5)*60000);
+                    this.scene.add(cloud);
+                }
+
+                // City buildings (land areas)
+                for(let c=0; c<4; c++) {
+                    const cx = (Math.random()-0.5)*30000;
+                    const cz = (Math.random()-0.5)*30000;
+                    for(let i=0; i<20; i++) {
+                        const h = 30 + Math.random()*200;
+                        const w = 20 + Math.random()*40;
+                        const bld = new THREE.Mesh(
+                            new THREE.BoxGeometry(w, h, w),
+                            new THREE.MeshStandardMaterial({color: 0x334455 + Math.floor(Math.random()*0x222222)})
+                        );
+                        bld.position.set(cx + (Math.random()-0.5)*600, h/2, cz + (Math.random()-0.5)*600);
+                        this.scene.add(bld);
+                    }
+                }
+
+                // Birds (simple V-shapes flying)
+                this.entities.birds = [];
+                for(let i=0; i<8; i++) {
+                    const bird = new THREE.Group();
+                    const wing1 = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({color:0x222222, side: THREE.DoubleSide}));
+                    wing1.rotation.z = 0.3; wing1.position.x = -2;
+                    const wing2 = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({color:0x222222, side: THREE.DoubleSide}));
+                    wing2.rotation.z = -0.3; wing2.position.x = 2;
+                    bird.add(wing1, wing2);
+                    bird.position.set((Math.random()-0.5)*20000, 300 + Math.random()*800, (Math.random()-0.5)*20000);
+                    this.scene.add(bird);
+                    this.entities.birds.push({ mesh: bird, speed: 0.8 + Math.random()*0.5 });
+                }
+
                 this.runway = new THREE.Group();
                 const deck = new THREE.Mesh(new THREE.BoxGeometry(300, 15, 2500), new THREE.MeshStandardMaterial({color:0x222222}));
                 const strip = new THREE.Mesh(new THREE.PlaneGeometry(15, 2500), new THREE.MeshBasicMaterial({color:0xbbbb00}));
@@ -316,6 +359,15 @@
 
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
                 document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
+
+                // Pause toggle (P key)
+                window.addEventListener('keydown', (e) => {
+                    if(e.key === 'p' || e.key === 'P') {
+                        if(!this.state.active) return;
+                        this.state.paused = !this.state.paused;
+                        document.getElementById('msg-box').innerText = this.state.paused ? "PAUSED" : "";
+                    }
+                });
             }
 
             start() {
@@ -323,6 +375,7 @@
                 this.state.targetKills = 10 * this.state.difficulty;
                 this.initAudio(); this.initWorld(); this.createPlayer();
                 this.state.active = true; this.state.takeoff = true;
+                this.playerHP = 3 + (6 - this.state.difficulty); // HP: 8 at lv1, 4 at lv5
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
                 document.getElementById('msg-box').innerText = "FULL THRUST TO TAKEOFF!";
@@ -376,18 +429,57 @@
                     al.mesh.position.lerp(targetPos, 0.08); al.mesh.quaternion.slerp(this.player.quaternion, 0.08);
                 });
 
+                // Enemy AI
+                this.entities.enemies.forEach(en => {
+                    const dir = this.player.position.clone().sub(en.mesh.position);
+                    const dist = dir.length();
+                    if(dist > 100) {
+                        dir.normalize();
+                        const targetQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1), dir);
+                        en.mesh.quaternion.slerp(targetQuat, 0.02 + this.state.difficulty * 0.005);
+                        en.mesh.translateZ(-(1.5 + this.state.difficulty * 0.5) * delta * 60);
+                    }
+                    // Enemy fires at player
+                    if(!en.fireTimer) en.fireTimer = Math.random() * 3;
+                    en.fireTimer -= delta;
+                    if(en.fireTimer <= 0 && dist < 3000) {
+                        en.fireTimer = 2.5 - this.state.difficulty * 0.3;
+                        const eb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 4), new THREE.MeshBasicMaterial({color:0xff4444}));
+                        eb.position.copy(en.mesh.position);
+                        this.scene.add(eb);
+                        const edir = this.player.position.clone().sub(en.mesh.position).normalize().multiplyScalar(40);
+                        this.entities.bullets.push({ mesh: eb, life: 1.5, vel: edir, isEnemy: true });
+                    }
+                });
+
                 this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
+                if(this.entities.birds) this.entities.birds.forEach(b => { b.mesh.translateZ(-b.speed); if(b.mesh.position.z < -20000) b.mesh.position.z = 20000; });
                 this.entities.airliners.forEach(a => { 
                     a.mesh.translateZ(a.speed); if(a.mesh.position.z > 40000) a.mesh.position.z = -40000; 
                     a.trailTimer += delta; if(a.trailTimer > 0.15) { this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10))); a.trailTimer = 0; }
                 });
 
-                if(this.input.firing && this.clock.elapsedTime % 0.15 < 0.02) {
+                if(!this.fireTimer) this.fireTimer = 0;
+                this.fireTimer -= delta;
+                if(this.input.firing && this.fireTimer <= 0) {
+                    this.fireTimer = 0.15;
                     if(this.audio.laser) { if(this.audio.laser.isPlaying) this.audio.laser.stop(); this.audio.laser.play(); }
                     const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 6), new THREE.MeshBasicMaterial({color:0x00f2ff}));
                     b.position.copy(this.player.position); b.quaternion.copy(this.player.quaternion);
                     this.scene.add(b);
-                    this.entities.bullets.push({ mesh: b, life: 1.8, vel: new THREE.Vector3(0,0,-50).applyQuaternion(this.player.quaternion) });
+                    // Auto-aim: guide bullet toward nearest enemy (stronger at lower difficulty)
+                    let bulletDir = new THREE.Vector3(0,0,-50).applyQuaternion(this.player.quaternion);
+                    const aimStrength = (6 - this.state.difficulty) * 0.15; // 0.75 at lv1, 0.15 at lv5
+                    let nearestDist = Infinity, nearestEnemy = null;
+                    this.entities.enemies.forEach(en => {
+                        const d = en.mesh.position.distanceTo(this.player.position);
+                        if(d < nearestDist && d < 5000) { nearestDist = d; nearestEnemy = en; }
+                    });
+                    if(nearestEnemy) {
+                        const toEnemy = nearestEnemy.mesh.position.clone().sub(this.player.position).normalize().multiplyScalar(50);
+                        bulletDir.lerp(toEnemy, aimStrength);
+                    }
+                    this.entities.bullets.push({ mesh: b, life: 1.8, vel: bulletDir });
                 }
 
                 for(let i=this.entities.bullets.length-1; i>=0; i--) {
@@ -401,6 +493,15 @@
                             if(this.state.kills >= this.state.targetKills) this.gameOver(true);
                         }
                     });
+                    // Enemy bullet hits player
+                    if(b.isEnemy && this.player && b.mesh.position.distanceTo(this.player.position) < 30) {
+                        this.createExplosion(this.player.position.clone());
+                        if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                        b.life = 0;
+                        if(!this.playerHP) this.playerHP = 3 + (6 - this.state.difficulty);
+                        this.playerHP--;
+                        if(this.playerHP <= 0) this.gameOver(false);
+                    }
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
                 }
 
@@ -423,6 +524,15 @@
                 const camOff = new THREE.Vector3(0, 3.8, 13 + this.speed*2.5).applyQuaternion(this.player.quaternion);
                 this.camera.position.lerp(this.player.position.clone().add(camOff), 0.15);
                 this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-25).applyQuaternion(this.player.quaternion)));
+
+                // Particle update
+                for(let i=this.entities.particles.length-1; i>=0; i--) {
+                    const p = this.entities.particles[i];
+                    p.mesh.position.add(p.vel);
+                    p.life -= delta;
+                    p.mesh.material.opacity = Math.max(0, p.life / (p.isSmoke ? 2.5 : 2.0));
+                    if(p.life <= 0) { this.scene.remove(p.mesh); this.entities.particles.splice(i, 1); }
+                }
 
                 if(!this.state.takeoff && this.player.position.y < 5) this.gameOver(false);
 
@@ -452,8 +562,16 @@
 
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
+                const score = this.state.kills * 100 * this.state.difficulty + (success ? this.state.timeLeft * 50 : 0);
+                const ratio = this.state.kills / this.state.targetKills;
+                let recLevel = this.state.difficulty;
+                if(success && ratio >= 1 && this.state.timeLeft > 20) recLevel = Math.min(5, recLevel + 1);
+                else if(!success && ratio < 0.3) recLevel = Math.max(1, recLevel - 1);
+
                 document.getElementById('over-title').innerText = success ? "MISSION COMPLETE" : "MISSION FAILED";
-                document.getElementById('over-stats').innerText = `ACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills}`;
+                let stats = `ACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills} / ${this.state.targetKills}\nSCORE: ${score}`;
+                if(recLevel !== this.state.difficulty) stats += `\nRECOMMENDED LEVEL: ${recLevel}`;
+                document.getElementById('over-stats').innerText = stats;
                 document.getElementById('over-screen').style.display = 'flex';
                 if(this.audio.engine) this.audio.engine.stop();
             }
