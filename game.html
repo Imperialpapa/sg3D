@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skyline Ace: Living World</title>
+    <title>Skyline Ace: Visual Overdrive</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
         :root { --accent: #00f2ff; --danger: #ff4444; --ally: #00ff88; --glass: rgba(0, 0, 0, 0.7); }
@@ -11,11 +11,11 @@
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: radial-gradient(circle at center, rgba(10,40,80,0.9), #000);
+            background: radial-gradient(circle at center, rgba(15,35,70,0.95), #000);
             z-index: 100; transition: opacity 0.8s;
         }
         .card {
-            background: var(--glass); backdrop-filter: blur(20px);
+            background: var(--glass); backdrop-filter: blur(25px);
             padding: 30px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1);
             text-align: center; width: 85%; max-width: 400px;
         }
@@ -30,20 +30,17 @@
             background: #fff; color: #000; border: none; font-weight: 700; cursor: pointer;
         }
         #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        .hud-el { position: absolute; padding: 12px; background: var(--glass); border-radius: 12px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        .hud-el { position: absolute; padding: 12px; background: var(--glass); border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .hud-tl { top: 20px; left: 20px; border-left: 4px solid var(--accent); }
         .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 4px solid var(--danger); }
         .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
         
-        /* Advanced Radar */
         #radar-ui {
             position: absolute; bottom: 40px; left: 210px; width: 120px; height: 120px;
             border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
             background: radial-gradient(circle, rgba(0,40,40,0.6) 0%, rgba(0,10,10,0.8) 100%);
             backdrop-filter: blur(4px);
         }
-        #radar-ui::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(0,242,255,0.1); }
-        #radar-ui::after { content: ''; position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(0,242,255,0.1); }
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 5px currentColor; }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
@@ -132,8 +129,7 @@
         const SOUNDS = {
             engine: 'https://actions.google.com/sounds/v1/transportation/jet_plane_flying_loop.ogg',
             laser: 'https://actions.google.com/sounds/v1/science_fiction/low_laser_shot.ogg',
-            explosion: 'https://actions.google.com/sounds/v1/explosions/distant_explosion.ogg',
-            bgm: 'https://actions.google.com/sounds/v1/ambiences/industrial_hum.ogg'
+            explosion: 'https://actions.google.com/sounds/v1/explosions/distant_explosion.ogg'
         };
 
         class Game {
@@ -150,7 +146,7 @@
 
             initScene() {
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 60000);
+                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 80000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -177,38 +173,36 @@
 
             initWorld() {
                 const isDay = new Date().getHours() > 6 && new Date().getHours() < 19;
-                this.scene.background = new THREE.Color(isDay ? 0x77bbff : 0x050515);
-                this.scene.fog = new THREE.FogExp2(isDay ? 0xaaccff : 0x000000, 0.00015);
-                this.scene.add(new THREE.AmbientLight(0xffffff, isDay ? 0.9 : 0.3));
-                const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-                sun.position.set(1000, 2000, -1000);
+                this.scene.background = new THREE.Color(isDay ? 0x66ccff : 0x050520);
+                this.scene.fog = new THREE.FogExp2(isDay ? 0x99ccff : 0x0a0a2a, 0.0001);
+                
+                // Bright lighting as requested
+                this.scene.add(new THREE.AmbientLight(0xffffff, isDay ? 1.0 : 0.6));
+                const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+                sun.position.set(2000, 3000, -2000);
                 this.scene.add(sun);
 
-                // Ocean
-                const ocean = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshStandardMaterial({ color: 0x002244, metalness: 0.8, roughness: 0.1 }));
+                const ocean = new THREE.Mesh(new THREE.PlaneGeometry(80000, 80000), new THREE.MeshStandardMaterial({ color: 0x003366, metalness: 0.6, roughness: 0.2 }));
                 ocean.rotation.x = -Math.PI/2;
                 this.scene.add(ocean);
 
-                // Moving Ships
-                for(let i=0; i<15; i++) {
+                for(let i=0; i<20; i++) {
                     const ship = this.createShip();
-                    ship.position.set((Math.random()-0.5)*30000, 0, (Math.random()-0.5)*30000);
+                    ship.position.set((Math.random()-0.5)*40000, 0, (Math.random()-0.5)*40000);
                     this.scene.add(ship);
-                    this.entities.ships.push({ mesh: ship, speed: 0.2 + Math.random()*0.3 });
+                    this.entities.ships.push({ mesh: ship, speed: 0.2 + Math.random()*0.4 });
                 }
 
-                // Moving Airliners
-                for(let i=0; i<5; i++) {
+                for(let i=0; i<8; i++) {
                     const plane = this.createAirliner();
-                    plane.position.set((Math.random()-0.5)*40000, 3000 + Math.random()*2000, (Math.random()-0.5)*40000);
+                    plane.position.set((Math.random()-0.5)*60000, 3500 + Math.random()*2500, (Math.random()-0.5)*60000);
                     this.scene.add(plane);
-                    this.entities.airliners.push({ mesh: plane, speed: 2.0 + Math.random()*1.5 });
+                    this.entities.airliners.push({ mesh: plane, speed: 2.5 + Math.random()*2.0, trailTimer: 0 });
                 }
 
-                // Runway
                 this.runway = new THREE.Group();
-                const deck = new THREE.Mesh(new THREE.BoxGeometry(250, 15, 2000), new THREE.MeshStandardMaterial({color:0x222222}));
-                const strip = new THREE.Mesh(new THREE.PlaneGeometry(12, 2000), new THREE.MeshBasicMaterial({color:0xaaaa00}));
+                const deck = new THREE.Mesh(new THREE.BoxGeometry(300, 15, 2500), new THREE.MeshStandardMaterial({color:0x222222}));
+                const strip = new THREE.Mesh(new THREE.PlaneGeometry(15, 2500), new THREE.MeshBasicMaterial({color:0xbbbb00}));
                 strip.rotation.x = -Math.PI/2; strip.position.y = 7.6;
                 this.runway.add(deck, strip);
                 this.scene.add(this.runway);
@@ -216,19 +210,19 @@
 
             createShip() {
                 const group = new THREE.Group();
-                const body = new THREE.Mesh(new THREE.BoxGeometry(50, 20, 150), new THREE.MeshStandardMaterial({color:0x444444}));
-                const tower = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 40), new THREE.MeshStandardMaterial({color:0x555555}));
-                tower.position.set(0, 25, -20);
+                const body = new THREE.Mesh(new THREE.BoxGeometry(60, 25, 200), new THREE.MeshStandardMaterial({color:0x444444}));
+                const tower = new THREE.Mesh(new THREE.BoxGeometry(35, 40, 50), new THREE.MeshStandardMaterial({color:0x555555}));
+                tower.position.set(0, 30, -30);
                 group.add(body, tower);
                 return group;
             }
 
             createAirliner() {
                 const group = new THREE.Group();
-                const mat = new THREE.MeshStandardMaterial({color:0xffffff});
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 120, 8), mat);
+                const mat = new THREE.MeshStandardMaterial({color:0xffffff, emissive: 0x222222});
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 150, 12), mat);
                 body.rotation.x = Math.PI/2;
-                const wings = new THREE.Mesh(new THREE.BoxGeometry(110, 1, 30), mat);
+                const wings = new THREE.Mesh(new THREE.BoxGeometry(140, 1.5, 40), mat);
                 wings.position.z = 10;
                 group.add(body, wings);
                 return group;
@@ -236,32 +230,32 @@
 
             createPlayer() {
                 this.player = new THREE.Group();
-                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.1 });
                 if(this.state.unit === 'JET') {
-                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.6, 6, 8), mat);
+                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.7, 7, 12), mat);
                     body.rotation.x = -Math.PI/2;
-                    const wings = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.1, 2), mat);
+                    const wings = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.1, 2.5), mat);
                     wings.position.z = 0.5;
                     this.player.add(body, wings);
                 } else {
-                    const core = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 0.8, 16), mat);
-                    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({color:0x00f2ff, transparent:true, opacity:0.6}));
-                    dome.position.y = 0.4;
+                    const core = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 3.5, 1, 24), mat);
+                    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.2, 24, 16, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({color:0x00f2ff, transparent:true, opacity:0.7}));
+                    dome.position.y = 0.5;
                     this.player.add(core, dome);
                 }
                 this.scene.add(this.player);
-                this.player.position.set(0, 15, 800);
+                this.player.position.set(0, 15, 1000);
                 this.speed = 0;
             }
 
             spawnEnemy() {
                 const enemy = new THREE.Group();
-                const mat = new THREE.MeshStandardMaterial({ color: 0x330000 });
-                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.6, 6), mat));
-                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(7, 0.1, 2), mat));
-                enemy.position.set((Math.random()-0.5)*15000, 400+Math.random()*1200, (Math.random()-0.5)*15000);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x440000, emissive: 0x220000 });
+                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 7), mat));
+                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 2.5), mat));
+                enemy.position.set((Math.random()-0.5)*20000, 500+Math.random()*1500, (Math.random()-0.5)*20000);
                 this.scene.add(enemy);
-                this.entities.enemies.push({ mesh: enemy, hp: 2 });
+                this.entities.enemies.push({ mesh: enemy, hp: 3 });
             }
 
             setupUI() {
@@ -292,7 +286,7 @@
                 this.state.active = true; this.state.takeoff = true;
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
-                document.getElementById('msg-box').innerText = "FULL THRUST FOR TAKEOFF";
+                document.getElementById('msg-box').innerText = "THRUST TO MAX FOR TAKEOFF";
                 for(let i=0; i<this.state.targetKills; i++) this.spawnEnemy();
                 this.timerInterval = setInterval(() => {
                     if(this.state.active && !this.state.paused) {
@@ -302,24 +296,28 @@
                 }, 1000);
             }
 
-            updateRadar() {
-                const dots = document.getElementById('radar-dots');
-                dots.innerHTML = '';
-                const range = 5000;
-                this.entities.enemies.forEach(en => {
-                    const dx = en.mesh.position.x - this.player.position.x;
-                    const dz = en.mesh.position.z - this.player.position.z;
-                    const dist = Math.sqrt(dx*dx + dz*dz);
-                    if(dist < range) {
-                        const x = (dx / range) * 60 + 60;
-                        const y = (dz / range) * 60 + 60;
-                        const dot = document.createElement('div');
-                        dot.className = 'radar-dot';
-                        dot.style.left = x + 'px'; dot.style.top = y + 'px';
-                        dot.style.color = 'var(--danger)';
-                        dots.appendChild(dot);
-                    }
-                });
+            createExplosion(pos) {
+                const count = 30;
+                for(let i=0; i<count; i++) {
+                    const isSmoke = Math.random() > 0.4;
+                    const mat = new THREE.MeshBasicMaterial({ 
+                        color: isSmoke ? 0x666666 : (Math.random() > 0.5 ? 0xffaa00 : 0xff4400),
+                        transparent: true, opacity: 1.0
+                    });
+                    const p = new THREE.Mesh(new THREE.SphereGeometry(isSmoke ? 4 : 2, 8, 8), mat);
+                    p.position.copy(pos);
+                    const vel = new THREE.Vector3((Math.random()-0.5)*12, (Math.random()-0.5)*12, (Math.random()-0.5)*12);
+                    this.scene.add(p);
+                    this.entities.particles.push({ mesh: p, vel, life: isSmoke ? 2.5 : 1.2, isSmoke });
+                }
+            }
+
+            createTrail(pos, color = 0xffffff) {
+                const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
+                const p = new THREE.Mesh(new THREE.SphereGeometry(3, 4, 4), mat);
+                p.position.copy(pos);
+                this.scene.add(p);
+                this.entities.particles.push({ mesh: p, vel: new THREE.Vector3(0,0,0), life: 3.0, isTrail: true });
             }
 
             animate() {
@@ -330,13 +328,12 @@
                 }
                 const delta = Math.min(this.clock.getDelta(), 0.1);
 
-                // Takeoff / Flight
                 if(this.state.takeoff) {
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.0, 0.02);
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.2, 0.02);
                     this.player.translateZ(-this.speed);
-                    if(this.speed > 2.8 && this.player.position.z < -300) {
+                    if(this.speed > 3.0 && this.player.position.z < -400) {
                         this.player.rotateX(0.4 * delta);
-                        if(this.player.position.y > 150) {
+                        if(this.player.position.y > 180) {
                             this.state.takeoff = false;
                             document.getElementById('msg-box').innerText = "";
                         }
@@ -349,29 +346,35 @@
                     } else {
                         this.player.rotateX(sX * 2.5 * delta); this.player.rotateZ(sZ * 3.5 * delta);
                     }
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (5.5 + this.state.difficulty), 0.05);
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (6.0 + this.state.difficulty), 0.05);
                     this.player.translateZ(-this.speed);
                 }
 
-                // Entity Movement
-                this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 30000) s.mesh.position.z = -30000; });
-                this.entities.airliners.forEach(a => { a.mesh.translateZ(a.speed); if(a.mesh.position.z > 30000) a.mesh.position.z = -30000; });
-                this.entities.enemies.forEach(en => { en.mesh.translateZ(-1.8); if(en.mesh.position.distanceTo(this.player.position) < 3000) en.mesh.lookAt(this.player.position); });
+                this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
+                this.entities.airliners.forEach(a => { 
+                    a.mesh.translateZ(a.speed); if(a.mesh.position.z > 40000) a.mesh.position.z = -40000; 
+                    a.trailTimer += delta;
+                    if(a.trailTimer > 0.1) {
+                        this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10)));
+                        a.trailTimer = 0;
+                    }
+                });
+                this.entities.enemies.forEach(en => { en.mesh.translateZ(-2.0); if(en.mesh.position.distanceTo(this.player.position) < 4000) en.mesh.lookAt(this.player.position); });
 
-                // Combat
                 if(this.input.firing && this.clock.elapsedTime % 0.15 < 0.02) {
                     if(this.audio.laser) { if(this.audio.laser.isPlaying) this.audio.laser.stop(); this.audio.laser.play(); }
-                    const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 5), new THREE.MeshBasicMaterial({color:0x00f2ff}));
+                    const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 6), new THREE.MeshBasicMaterial({color:0x00f2ff}));
                     b.position.copy(this.player.position); b.quaternion.copy(this.player.quaternion);
                     this.scene.add(b);
-                    this.entities.bullets.push({ mesh: b, life: 1.5, vel: new THREE.Vector3(0,0,-40).applyQuaternion(this.player.quaternion) });
+                    this.entities.bullets.push({ mesh: b, life: 1.8, vel: new THREE.Vector3(0,0,-45).applyQuaternion(this.player.quaternion) });
                 }
 
                 for(let i=this.entities.bullets.length-1; i>=0; i--) {
                     const b = this.entities.bullets[i]; b.mesh.position.add(b.vel); b.life -= delta;
                     this.entities.enemies.forEach((en, ei) => {
-                        if(b.mesh.position.distanceTo(en.mesh.position) < 40) {
+                        if(b.mesh.position.distanceTo(en.mesh.position) < 50) {
                             if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                            this.createExplosion(en.mesh.position);
                             this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
                             b.life = 0; this.state.kills++;
                             if(this.state.kills >= this.state.targetKills) this.gameOver(true);
@@ -380,20 +383,28 @@
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
                 }
 
-                // Map Wrap & Radar
-                if(Math.abs(this.player.position.x) > 30000) this.player.position.x *= -0.99;
-                if(Math.abs(this.player.position.z) > 30000) this.player.position.z *= -0.99;
-                this.updateRadar();
+                for(let i=this.entities.particles.length-1; i>=0; i--) {
+                    const p = this.entities.particles[i];
+                    p.mesh.position.add(p.vel);
+                    p.life -= delta;
+                    p.mesh.material.opacity = p.life / 3.0;
+                    if(p.isSmoke) p.mesh.scale.multiplyScalar(1.02);
+                    else if(p.isTrail) p.mesh.scale.multiplyScalar(0.98);
+                    else p.mesh.scale.multiplyScalar(0.95);
+                    if(p.life <= 0) { this.scene.remove(p.mesh); this.entities.particles.splice(i, 1); }
+                }
 
-                // Camera
-                const camOff = new THREE.Vector3(0, 3, 10 + this.speed*2).applyQuaternion(this.player.quaternion);
+                if(Math.abs(this.player.position.x) > 40000) this.player.position.x *= -0.99;
+                if(Math.abs(this.player.position.z) > 40000) this.player.position.z *= -0.99;
+
+                const camOff = new THREE.Vector3(0, 3.5, 12 + this.speed*2.2).applyQuaternion(this.player.quaternion);
                 this.camera.position.lerp(this.player.position.clone().add(camOff), 0.15);
-                this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-20).applyQuaternion(this.player.quaternion)));
+                this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-25).applyQuaternion(this.player.quaternion)));
 
                 if(!this.state.takeoff && this.player.position.y < 5) this.gameOver(false);
 
                 document.getElementById('alt-val').innerText = Math.floor(this.player.position.y);
-                document.getElementById('spd-val').innerText = (this.speed * 160).toFixed(0);
+                document.getElementById('spd-val').innerText = (this.speed * 180).toFixed(0);
                 document.getElementById('kill-val').innerText = this.state.kills;
                 document.getElementById('target-val').innerText = this.state.targetKills;
                 document.getElementById('timer-val').innerText = this.state.timeLeft;
@@ -403,7 +414,7 @@
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
                 document.getElementById('over-title').innerText = success ? "MISSION ACCOMPLISHED" : "MISSION FAILED";
-                document.getElementById('over-stats').innerText = `Stage ${this.state.difficulty} | Kills: ${this.state.kills}`;
+                document.getElementById('over-stats').innerText = `ACE LEVEL ${this.state.difficulty} | CONFIRMED KILLS: ${this.state.kills}`;
                 document.getElementById('over-screen').style.display = 'flex';
                 if(this.audio.engine) this.audio.engine.stop();
             }
