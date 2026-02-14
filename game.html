@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skyline Ace: Flight Calibration</title>
+    <title>Skyline Ace: Flight Fixed</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
         :root { --accent: #00f2ff; --danger: #ff4444; --ally: #00ff88; --glass: rgba(0, 0, 0, 0.7); }
@@ -11,7 +11,7 @@
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: radial-gradient(circle at center, rgba(20,45,90,0.95), #000);
+            background: radial-gradient(circle at center, rgba(15,35,80,0.95), #000);
             z-index: 100; transition: opacity 0.8s;
         }
         .card {
@@ -34,7 +34,6 @@
         .hud-tl { top: 20px; left: 20px; border-left: 4px solid var(--accent); }
         .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 4px solid var(--danger); }
         .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
-        
         #radar-ui {
             position: absolute; bottom: 40px; left: 210px; width: 120px; height: 120px;
             border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
@@ -43,21 +42,19 @@
         }
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 5px currentColor; }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
-
         #speed-lever-zone {
             position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
             height: 200px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
         }
         #speed-slider { -webkit-appearance: none; width: 180px; height: 4px; background: rgba(255,255,255,0.2); transform: rotate(-90deg); margin-top: 85px; outline: none; }
         #speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 25px; background: var(--accent); cursor: pointer; border-radius: 5px; box-shadow: 0 0 15px var(--accent); }
-        
         #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; pointer-events: auto; }
         #fire-btn { 
             position: absolute; bottom: 60px; right: 120px; width: 80px; height: 80px; 
             border-radius: 50%; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
             display: flex; justify-content: center; align-items: center; pointer-events: auto; color: white; font-weight: 700;
         }
-        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 24px; color: var(--accent); text-align: center; pointer-events: none; }
+        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 24px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
     </style>
 </head>
 <body>
@@ -107,12 +104,7 @@
             <div style="font-size:10px; opacity:0.7;">REMAINING</div>
             <div style="font-size:20px; color:var(--danger);" id="timer-val">60</div>
         </div>
-        
-        <div id="radar-ui">
-            <div id="radar-player"></div>
-            <div id="radar-dots"></div>
-        </div>
-
+        <div id="radar-ui"><div id="radar-player"></div><div id="radar-dots"></div></div>
         <div id="speed-lever-zone">
             <div style="font-size:9px; opacity:0.6; margin-bottom:60px;">THRUST</div>
             <input type="range" id="speed-slider" min="0" max="100" value="0">
@@ -179,21 +171,18 @@
                 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
                 sun.position.set(2000, 3000, -2000);
                 this.scene.add(sun);
-
                 const ocean = new THREE.Mesh(new THREE.PlaneGeometry(80000, 80000), new THREE.MeshStandardMaterial({ color: 0x003366, metalness: 0.6, roughness: 0.2 }));
                 ocean.rotation.x = -Math.PI/2;
                 this.scene.add(ocean);
 
                 this.createLandmarks();
-
-                for(let i=0; i<20; i++) {
+                for(let i=0; i<15; i++) {
                     const ship = this.createShip();
                     ship.position.set((Math.random()-0.5)*40000, 0, (Math.random()-0.5)*40000);
                     this.scene.add(ship);
                     this.entities.ships.push({ mesh: ship, speed: 0.2 + Math.random()*0.4 });
                 }
-
-                for(let i=0; i<8; i++) {
+                for(let i=0; i<6; i++) {
                     const plane = this.createAirliner();
                     plane.position.set((Math.random()-0.5)*60000, 3500 + Math.random()*2500, (Math.random()-0.5)*60000);
                     this.scene.add(plane);
@@ -296,11 +285,10 @@
                 };
                 nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left:'50%', top:'50%'}, color:'cyan' })
                     .on('move', (e, d) => {
-                        // 곡선 감도 적용: 미세 조작은 부드럽게, 큰 조작은 확실하게
-                        const signX = Math.sign(d.vector.x);
-                        const signY = Math.sign(d.vector.y);
-                        this.input.joystick.x = signX * Math.pow(Math.abs(d.vector.x), 1.5);
-                        this.input.joystick.y = signY * Math.pow(Math.abs(d.vector.y), 1.5);
+                        // NippleJS Y축: 위로 밀면 음수(-), 아래로 당기면 양수(+)
+                        // Arcade 모드: 위로 밀면 상승하도록 부호 반전
+                        this.input.joystick.x = d.vector.x;
+                        this.input.joystick.y = -d.vector.y; 
                     })
                     .on('end', () => this.input.joystick = {x:0, y:0});
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
@@ -314,6 +302,7 @@
                 this.state.active = true; this.state.takeoff = true;
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
+                document.getElementById('msg-box').innerText = "MAX THROTTLE TO TAKEOFF!";
                 for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
                 for(let i=0; i<2; i++) this.spawnUnit(true);
                 this.timerInterval = setInterval(() => {
@@ -332,29 +321,33 @@
                 }
                 const delta = Math.min(this.clock.getDelta(), 0.1);
 
+                // 이륙 시퀀스 점검
                 if(this.state.takeoff) {
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.2, 0.02);
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.5, 0.03);
                     this.player.translateZ(-this.speed);
-                    if(this.speed > 3.0 && this.player.position.z < -400) {
+                    
+                    // 활주로 가속 후 자동 부양
+                    if(this.speed > 2.0 && this.player.position.z < 200) {
                         this.player.rotateX(0.4 * delta);
-                        if(this.player.position.y > 180) this.state.takeoff = false;
+                        if(this.player.position.y > 150) {
+                            this.state.takeoff = false;
+                            document.getElementById('msg-box').innerText = "AIRBORNE - MISSION START";
+                            setTimeout(() => document.getElementById('msg-box').innerText = "", 2000);
+                        }
                     }
                 } else {
-                    // 비행 물리 개선
-                    const pitch = this.input.joystick.y; // Inverted Pitch (standard)
+                    // 비행 조종 로직 (Arcade 방식: 위로 밀면 상승)
+                    const pitch = this.input.joystick.y; 
                     const roll = -this.input.joystick.x;
                     
-                    if(Math.abs(pitch) < 0.01 && Math.abs(roll) < 0.01) {
-                        // 자동 수평 유지 (쿼터니언 보간으로 더 안정적임)
-                        const targetRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
-                        this.player.quaternion.slerp(targetRot, 0.03);
+                    if(Math.abs(pitch) > 0.05 || Math.abs(roll) > 0.05) {
+                        this.player.rotateX(pitch * 2.5 * delta);
+                        this.player.rotateZ(roll * 3.5 * delta);
+                        this.player.rotateY(-roll * 1.2 * delta); // Coordinated turn
                     } else {
-                        // 피치(Pitch)와 롤(Roll) 적용
-                        this.player.rotateX(pitch * 2.8 * delta);
-                        this.player.rotateZ(roll * 3.8 * delta);
-                        
-                        // 롤(Roll) 시 자연스러운 요(Yaw/선회) 추가
-                        this.player.rotateY(-roll * 1.5 * delta);
+                        // 자동 수평 유지
+                        const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
+                        this.player.quaternion.slerp(targetQuat, 0.04);
                     }
                     this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (6.0 + this.state.difficulty), 0.05);
                     this.player.translateZ(-this.speed);
@@ -362,13 +355,13 @@
 
                 this.entities.allies.forEach(al => {
                     const targetPos = this.player.position.clone().add(al.offset.clone().applyQuaternion(this.player.quaternion));
-                    al.mesh.position.lerp(targetPos, 0.06); al.mesh.quaternion.slerp(this.player.quaternion, 0.06);
+                    al.mesh.position.lerp(targetPos, 0.07); al.mesh.quaternion.slerp(this.player.quaternion, 0.07);
                 });
 
                 this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
                 this.entities.airliners.forEach(a => { 
                     a.mesh.translateZ(a.speed); if(a.mesh.position.z > 40000) a.mesh.position.z = -40000; 
-                    a.trailTimer += delta; if(a.trailTimer > 0.12) { this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10))); a.trailTimer = 0; }
+                    a.trailTimer += delta; if(a.trailTimer > 0.15) { this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10))); a.trailTimer = 0; }
                 });
 
                 if(this.input.firing && this.clock.elapsedTime % 0.15 < 0.02) {
@@ -376,13 +369,13 @@
                     const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 6), new THREE.MeshBasicMaterial({color:0x00f2ff}));
                     b.position.copy(this.player.position); b.quaternion.copy(this.player.quaternion);
                     this.scene.add(b);
-                    this.entities.bullets.push({ mesh: b, life: 1.8, vel: new THREE.Vector3(0,0,-45).applyQuaternion(this.player.quaternion) });
+                    this.entities.bullets.push({ mesh: b, life: 1.8, vel: new THREE.Vector3(0,0,-50).applyQuaternion(this.player.quaternion) });
                 }
 
                 for(let i=this.entities.bullets.length-1; i>=0; i--) {
                     const b = this.entities.bullets[i]; b.mesh.position.add(b.vel); b.life -= delta;
                     this.entities.enemies.forEach((en, ei) => {
-                        if(b.mesh.position.distanceTo(en.mesh.position) < 50) {
+                        if(b.mesh.position.distanceTo(en.mesh.position) < 60) {
                             if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
                             this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
                             b.life = 0; this.state.kills++;
@@ -392,17 +385,14 @@
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
                 }
 
-                // Radar Update
-                const dots = document.getElementById('radar-dots');
-                dots.innerHTML = '';
+                // Radar & Wrap
+                const dots = document.getElementById('radar-dots'); dots.innerHTML = '';
                 [...this.entities.enemies, ...this.entities.allies, ...this.entities.landmarks].forEach(ent => {
                     const dx = ent.mesh.position.x - this.player.position.x;
                     const dz = ent.mesh.position.z - this.player.position.z;
                     if(dx*dx + dz*dz < 10000*10000) {
-                        const dot = document.createElement('div');
-                        dot.className = 'radar-dot';
-                        dot.style.left = (dx / 10000) * 60 + 60 + 'px';
-                        dot.style.top = (dz / 10000) * 60 + 60 + 'px';
+                        const dot = document.createElement('div'); dot.className = 'radar-dot';
+                        dot.style.left = (dx / 10000) * 60 + 60 + 'px'; dot.style.top = (dz / 10000) * 60 + 60 + 'px';
                         dot.style.color = ent.isAlly ? 'var(--ally)' : (ent.name ? 'white' : 'var(--danger)');
                         dots.appendChild(dot);
                     }
@@ -426,9 +416,9 @@
             }
 
             createTrail(pos) {
-                const p = new THREE.Mesh(new THREE.SphereGeometry(3, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }));
+                const p = new THREE.Mesh(new THREE.SphereGeometry(3, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 }));
                 p.position.copy(pos); this.scene.add(p);
-                this.entities.particles.push({ mesh: p, vel: new THREE.Vector3(0,0,0), life: 2.5 });
+                this.entities.particles.push({ mesh: p, vel: new THREE.Vector3(0,0,0), life: 2.0 });
             }
 
             gameOver(success) {
