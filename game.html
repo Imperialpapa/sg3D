@@ -187,7 +187,7 @@
 
         class Game {
             constructor() {
-                this.state = { active: false, takeoff: false, paused: false, unit: 'JET', difficulty: 1, kills: 0, targetKills: 10, timeLeft: 60 };
+                this.state = { active: false, takeoff: false, paused: false, unit: 'JET', difficulty: 1, kills: 0, targetKills: 10, timeLeft: 300 };
                 this.input = { joystick: {x:0, y:0}, thrust: 0.5, firing: false };
                 this.leverInput = 0;
                 this.entities = { player: null, allies: [], enemies: [], bullets: [], ships: [], airliners: [], particles: [], landmarks: [] };
@@ -786,7 +786,8 @@
                 document.getElementById('spd-val').innerText = (this.speed * 180).toFixed(0);
                 document.getElementById('kill-val').innerText = this.state.kills;
                 document.getElementById('target-val').innerText = this.state.targetKills;
-                document.getElementById('timer-val').innerText = this.state.timeLeft;
+                const mm = Math.floor(this.state.timeLeft/60); const ss = String(this.state.timeLeft%60).padStart(2,'0');
+                document.getElementById('timer-val').innerText = mm+':'+ss;
                 this.renderer.render(this.scene, this.camera);
             }
 
