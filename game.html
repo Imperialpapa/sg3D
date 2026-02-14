@@ -97,6 +97,35 @@
             box-shadow: 0 0 10px rgba(255,68,68,0.3);
         }
 
+        #auto-fire-btn {
+            position: absolute; bottom: 85px; right: 15px; width: 65px; height: 28px;
+            border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+            display: flex; justify-content: center; align-items: center; pointer-events: auto;
+            color: rgba(255,255,255,0.5); font-weight: 500; z-index: 1000; font-size: 9px; letter-spacing: 1px;
+        }
+        #auto-fire-btn.active { background: rgba(0,242,255,0.2); border-color: var(--accent); color: var(--accent); }
+
+        /* Target lock-on reticle */
+        #target-reticle {
+            position: absolute; pointer-events: none; display: none; z-index: 150;
+        }
+        #target-reticle .reticle-ring {
+            width: 60px; height: 60px; border: 2px solid var(--danger); border-radius: 50%;
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            animation: reticle-spin 2s linear infinite;
+        }
+        #target-reticle .reticle-cross { position: absolute; background: var(--danger); }
+        #target-reticle .reticle-cross.h { width: 20px; height: 1px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        #target-reticle .reticle-cross.v { width: 1px; height: 20px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        #target-reticle .reticle-info {
+            position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; color: var(--danger); white-space: nowrap; letter-spacing: 1px;
+        }
+        #target-reticle.locked .reticle-ring { border-color: #00ff44; box-shadow: 0 0 12px rgba(0,255,68,0.5); }
+        #target-reticle.locked .reticle-cross { background: #00ff44; }
+        #target-reticle.locked .reticle-info { color: #00ff44; }
+        @keyframes reticle-spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+
         #msg-box { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font-size: 18px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
     </style>
 </head>
@@ -142,8 +171,10 @@
     <div id="over-screen" class="screen" style="display:none;">
         <div class="card">
             <h1 id="over-title" style="font-size:1.5rem;">MISSION END</h1>
-            <div id="over-stats" style="margin:15px 0; font-size:14px; opacity:0.8;"></div>
-            <button onclick="location.reload()" class="start-btn">REDEPLOY</button>
+            <div id="over-stats" style="margin:15px 0; font-size:14px; opacity:0.8; white-space:pre-line;"></div>
+            <div id="over-buttons">
+                <button onclick="location.reload()" class="start-btn">REDEPLOY</button>
+            </div>
         </div>
     </div>
 
@@ -171,7 +202,14 @@
             </div>
         </div>
         <div id="joystick-zone"><div id="joystick-guide"></div></div>
+        <div id="auto-fire-btn">AUTO</div>
         <div id="fire-btn">FIRE</div>
+        <div id="target-reticle">
+            <div class="reticle-ring"></div>
+            <div class="reticle-cross h"></div>
+            <div class="reticle-cross v"></div>
+            <div class="reticle-info"></div>
+        </div>
         <div id="msg-box"></div>
     </div>
 
@@ -505,6 +543,16 @@
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
                 document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
 
+                // Auto-fire toggle
+                this.autoFire = false;
+                const afBtn = document.getElementById('auto-fire-btn');
+                afBtn.ontouchstart = (e) => {
+                    e.preventDefault();
+                    this.autoFire = !this.autoFire;
+                    afBtn.classList.toggle('active', this.autoFire);
+                    afBtn.textContent = this.autoFire ? 'AUTO ON' : 'AUTO';
+                };
+
                 // Pause toggle (P key)
                 window.addEventListener('keydown', (e) => {
                     if(e.key === 'p' || e.key === 'P') {
@@ -678,29 +726,64 @@
                     a.trailTimer += delta; if(a.trailTimer > 0.15) { this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10))); a.trailTimer = 0; }
                 });
 
+                // Find nearest enemy for aiming & reticle
                 if(!this.fireTimer) this.fireTimer = 0;
                 this.fireTimer -= delta;
-                if(this.input.firing && this.fireTimer <= 0) {
+                let nearestDist = Infinity, nearestEnemy = null;
+                this.entities.enemies.forEach(en => {
+                    const d = en.mesh.position.distanceTo(this.player.position);
+                    if(d < nearestDist && d < 5000) { nearestDist = d; nearestEnemy = en; }
+                });
+
+                // Target reticle HUD
+                const reticle = document.getElementById('target-reticle');
+                const reticleInfo = reticle.querySelector('.reticle-info');
+                if(nearestEnemy && !this.state.takeoff) {
+                    // Project enemy position to screen
+                    const enemyPos = nearestEnemy.mesh.position.clone();
+                    const screenPos = enemyPos.clone().project(this.camera);
+                    const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+                    // Check if enemy is in front of camera and on screen
+                    const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(this.player.quaternion);
+                    const toEn = enemyPos.clone().sub(this.player.position).normalize();
+                    const dot = fwd.dot(toEn);
+                    const onScreen = dot > 0.7 && sx > 0 && sx < window.innerWidth && sy > 0 && sy < window.innerHeight;
+                    // Check if aimed well enough to hit (angle < 15 degrees)
+                    const canHit = dot > 0.96 && nearestDist < 3000;
+
+                    if(onScreen) {
+                        reticle.style.display = 'block';
+                        reticle.style.left = sx + 'px'; reticle.style.top = sy + 'px';
+                        reticle.className = canHit ? 'locked' : '';
+                        // Scale reticle bigger when closer
+                        const scale = canHit ? 1.3 : 0.9;
+                        reticle.querySelector('.reticle-ring').style.width = (60*scale)+'px';
+                        reticle.querySelector('.reticle-ring').style.height = (60*scale)+'px';
+                        reticleInfo.textContent = canHit ? `LOCK ${Math.floor(nearestDist)}m` : `${Math.floor(nearestDist)}m`;
+                    } else {
+                        reticle.style.display = 'none';
+                    }
+                } else {
+                    reticle.style.display = 'none';
+                }
+
+                // Fire: manual or auto-fire when locked
+                const shouldFire = this.input.firing || (this.autoFire && nearestEnemy && nearestDist < 3000);
+                if(shouldFire && this.fireTimer <= 0) {
                     this.fireTimer = 0.15;
                     if(this.audio.laser) { if(this.audio.laser.isPlaying) this.audio.laser.stop(); this.audio.laser.play(); }
-                    // Dual wing-mounted fire (alternate left/right)
                     this.fireToggle = !this.fireToggle;
                     const wingOffset = new THREE.Vector3(this.fireToggle ? 3.5 : -3.5, -0.1, -2).applyQuaternion(this.player.quaternion);
                     const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 5), new THREE.MeshBasicMaterial({color:0x00f2ff}));
                     b.position.copy(this.player.position).add(wingOffset); b.quaternion.copy(this.player.quaternion);
                     this.scene.add(b);
-                    // Muzzle flash
                     const mf = new THREE.Mesh(new THREE.SphereGeometry(0.6, 4, 4), new THREE.MeshBasicMaterial({color:0x88ffff, transparent:true, opacity:0.9}));
                     mf.position.copy(b.position); this.scene.add(mf);
                     this.entities.particles.push({ mesh: mf, vel: new THREE.Vector3(0,0,0), life: 0.08 });
-                    // Auto-aim: guide bullet toward nearest enemy (stronger at lower difficulty)
+                    // Auto-aim bullet guidance
                     let bulletDir = new THREE.Vector3(0,0,-50).applyQuaternion(this.player.quaternion);
-                    const aimStrength = (6 - this.state.difficulty) * 0.15; // 0.75 at lv1, 0.15 at lv5
-                    let nearestDist = Infinity, nearestEnemy = null;
-                    this.entities.enemies.forEach(en => {
-                        const d = en.mesh.position.distanceTo(this.player.position);
-                        if(d < nearestDist && d < 5000) { nearestDist = d; nearestEnemy = en; }
-                    });
+                    const aimStrength = (6 - this.state.difficulty) * 0.15;
                     if(nearestEnemy) {
                         const toEnemy = nearestEnemy.mesh.position.clone().sub(this.player.position).normalize().multiplyScalar(50);
                         bulletDir.lerp(toEnemy, aimStrength);
@@ -825,21 +908,68 @@
 
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
+                document.getElementById('target-reticle').style.display = 'none';
                 const score = this.state.kills * 100 * this.state.difficulty + (success ? this.state.timeLeft * 50 : 0);
                 const ratio = this.state.kills / this.state.targetKills;
                 let recLevel = this.state.difficulty;
                 if(success && ratio >= 1 && this.state.timeLeft > 20) recLevel = Math.min(5, recLevel + 1);
                 else if(!success && ratio < 0.3) recLevel = Math.max(1, recLevel - 1);
 
-                document.getElementById('over-title').innerText = success ? "MISSION COMPLETE" : "MISSION FAILED";
-                let stats = `ACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills} / ${this.state.targetKills}\nSCORE: ${score}`;
-                if(recLevel !== this.state.difficulty) stats += `\nRECOMMENDED LEVEL: ${recLevel}`;
-                document.getElementById('over-stats').innerText = stats;
+                const btns = document.getElementById('over-buttons');
+
+                if(success) {
+                    // Mission complete: return to base, offer next sortie
+                    document.getElementById('over-title').innerText = "RETURNING TO BASE";
+                    let stats = `MISSION COMPLETE!\nACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills} / ${this.state.targetKills}\nSCORE: ${score}`;
+                    if(recLevel !== this.state.difficulty) stats += `\nRECOMMENDED NEXT: Level ${recLevel}`;
+                    document.getElementById('over-stats').innerText = stats;
+                    const nextLevel = Math.min(5, this.state.difficulty + 1);
+                    btns.innerHTML = `
+                        <button class="start-btn" style="margin-top:10px;background:var(--accent);color:#000;" onclick="window._game.sortie(${nextLevel})">SORTIE LV${nextLevel}</button>
+                        <button class="start-btn" style="margin-top:8px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);" onclick="window._game.sortie(${this.state.difficulty})">REPLAY LV${this.state.difficulty}</button>
+                        <button class="start-btn" style="margin-top:8px;" onclick="location.reload()">MAIN MENU</button>`;
+                } else {
+                    document.getElementById('over-title').innerText = "MISSION FAILED";
+                    let stats = `ACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills} / ${this.state.targetKills}\nSCORE: ${score}`;
+                    if(recLevel !== this.state.difficulty) stats += `\nRECOMMENDED: Level ${recLevel}`;
+                    document.getElementById('over-stats').innerText = stats;
+                    btns.innerHTML = `
+                        <button class="start-btn" style="margin-top:10px;" onclick="window._game.sortie(${this.state.difficulty})">RETRY LV${this.state.difficulty}</button>
+                        <button class="start-btn" style="margin-top:8px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);" onclick="location.reload()">MAIN MENU</button>`;
+                }
                 document.getElementById('over-screen').style.display = 'flex';
                 if(this.audio.engine) this.audio.engine.stop();
             }
+
+            sortie(level) {
+                // Clean up current scene entities
+                [...this.entities.enemies, ...this.entities.allies].forEach(e => this.scene.remove(e.mesh));
+                this.entities.bullets.forEach(b => this.scene.remove(b.mesh));
+                this.entities.particles.forEach(p => this.scene.remove(p.mesh));
+                this.entities.enemies = []; this.entities.allies = [];
+                this.entities.bullets = []; this.entities.particles = [];
+                // Reset state for new sortie
+                this.state.difficulty = level;
+                this.state.targetKills = 10 * level;
+                this.state.kills = 0; this.state.timeLeft = 300;
+                this.state.active = true; this.state.takeoff = true;
+                this.playerHP = 3 + (6 - level);
+                this.input.thrust = 1.0; this.speed = 0;
+                this.player.position.set(0, 15, 1000);
+                this.player.quaternion.identity();
+                for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
+                for(let i=0; i<2; i++) this.spawnUnit(true);
+                document.getElementById('over-screen').style.display = 'none';
+                document.getElementById('msg-box').innerText = "AUTO TAKEOFF...";
+                this.timerInterval = setInterval(() => {
+                    if(this.state.active && !this.state.paused) {
+                        this.state.timeLeft--;
+                        if(this.state.timeLeft <= 0) this.gameOver(false);
+                    }
+                }, 1000);
+            }
         }
-        window.onload = () => new Game();
+        window.onload = () => { window._game = new Game(); };
     </script>
 </body>
 </html>
