@@ -38,42 +38,51 @@
         .hud-tr { top: 15px; right: 15px; text-align: right; border-right: 3px solid var(--danger); }
         .hud-tm { top: 15px; left: 50%; transform: translateX(-50%); text-align: center; width: 100px; }
         
-        /* Central Radar - Positioned higher to avoid joysticks */
+        /* Central Radar - Largest UI element */
         #radar-ui {
-            position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%);
-            width: 90px; height: 90px; border-radius: 50%; border: 1px solid rgba(0,242,255,0.2);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 130px; height: 130px; border-radius: 50%; border: 2px solid rgba(0,242,255,0.35);
             background: radial-gradient(circle, rgba(0,30,30,0.6) 0%, rgba(0,10,10,0.8) 100%);
             backdrop-filter: blur(4px); pointer-events: none;
         }
-        .radar-dot { position: absolute; width: 3px; height: 3px; border-radius: 50%; transform: translate(-50%, -50%); }
-        #radar-player { position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
+        .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); }
+        #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
-        /* Left Control: Small Joystick */
-        #joystick-zone { 
-            position: absolute; bottom: 20px; left: 20px; width: 100px; height: 100px; 
+        /* Left Control: Joystick - 2/3 of radar */
+        #joystick-zone {
+            position: absolute; bottom: 15px; left: 15px; width: 130px; height: 130px;
             pointer-events: auto; z-index: 1000; touch-action: none;
         }
 
-        /* Right Controls: Lever & Fire */
+        /* Right Controls: Lever above Fire */
         #speed-lever-zone {
-            position: absolute; right: 20px; bottom: 120px;
-            height: 100px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
-            z-index: 1000;
+            position: absolute; right: 22px; bottom: 90px;
+            height: 120px; width: 50px; pointer-events: auto;
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 1000; touch-action: none;
         }
-        #speed-slider { 
-            -webkit-appearance: none; width: 80px; height: 4px; background: rgba(255,255,255,0.2); 
-            transform: rotate(-90deg); margin-top: 40px; outline: none; 
+        #lever-track {
+            width: 8px; height: 100px; background: rgba(255,255,255,0.15);
+            border-radius: 4px; position: relative; border: 1px solid rgba(255,255,255,0.2);
         }
-        #speed-slider::-webkit-slider-thumb { 
-            -webkit-appearance: none; width: 30px; height: 18px; background: var(--accent); 
-            cursor: pointer; border-radius: 3px; box-shadow: 0 0 8px var(--accent); 
+        #lever-handle {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 20px; background: var(--accent); border-radius: 4px;
+            box-shadow: 0 0 12px var(--accent), 0 0 4px rgba(0,242,255,0.5);
+            transition: top 0.2s ease-out;
         }
-        
-        #fire-btn { 
-            position: absolute; bottom: 20px; right: 20px; width: 75px; height: 75px; 
-            border-radius: 50%; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
-            display: flex; justify-content: center; align-items: center; pointer-events: auto; 
-            color: white; font-weight: 700; z-index: 1000; font-size: 14px;
+        #lever-label-up, #lever-label-dn {
+            font-size: 7px; opacity: 0.5; letter-spacing: 1px; position: absolute; width: 100%; text-align: center;
+        }
+        #lever-label-up { top: -14px; }
+        #lever-label-dn { bottom: -14px; }
+
+        #fire-btn {
+            position: absolute; bottom: 15px; right: 15px; width: 65px; height: 65px;
+            border-radius: 10px; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
+            display: flex; justify-content: center; align-items: center; pointer-events: auto;
+            color: white; font-weight: 700; z-index: 1000; font-size: 13px;
+            box-shadow: 0 0 10px rgba(255,68,68,0.3);
         }
 
         #msg-box { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font-size: 18px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
@@ -130,8 +139,11 @@
         <div id="radar-ui"><div id="radar-player"></div><div id="radar-dots"></div></div>
         
         <div id="speed-lever-zone">
-            <div style="font-size:8px; opacity:0.6; margin-bottom:30px;">THRUST</div>
-            <input type="range" id="speed-slider" min="0" max="100" value="0">
+            <div id="lever-track">
+                <div id="lever-label-up">ACC</div>
+                <div id="lever-handle"></div>
+                <div id="lever-label-dn">DEC</div>
+            </div>
         </div>
         <div id="joystick-zone"></div>
         <div id="fire-btn">FIRE</div>
@@ -151,7 +163,8 @@
         class Game {
             constructor() {
                 this.state = { active: false, takeoff: false, paused: false, unit: 'JET', difficulty: 1, kills: 0, targetKills: 10, timeLeft: 60 };
-                this.input = { joystick: {x:0, y:0}, thrust: 0, firing: false };
+                this.input = { joystick: {x:0, y:0}, thrust: 0.5, firing: false };
+                this.leverInput = 0;
                 this.entities = { player: null, allies: [], enemies: [], bullets: [], ships: [], airliners: [], particles: [], landmarks: [] };
                 this.audio = {};
                 this.initScene();
@@ -337,24 +350,42 @@
                 });
                 bnd('unit-select', 'unit'); bnd('diff-select', 'difficulty');
                 document.getElementById('start-btn').onclick = () => this.start();
-                document.getElementById('speed-slider').oninput = (e) => {
-                    this.input.thrust = e.target.value / 100;
-                    if(this.audio.engine) {
-                        if(!this.audio.engine.isPlaying) this.audio.engine.play();
-                        this.audio.engine.setPlaybackRate(0.6 + this.input.thrust);
-                    }
+
+                // Spring-back Lever: up=accelerate, down=decelerate, release=hold speed
+                this.input.thrust = 0.5; // start at mid
+                this.leverActive = false;
+                const leverZone = document.getElementById('speed-lever-zone');
+                const leverTrack = document.getElementById('lever-track');
+                const leverHandle = document.getElementById('lever-handle');
+                const handleLever = (e) => {
+                    e.preventDefault();
+                    const touch = e.touches ? e.touches[0] : e;
+                    const rect = leverTrack.getBoundingClientRect();
+                    const y = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+                    // y=0 top (accelerate), y=1 bottom (decelerate), 0.5=center
+                    leverHandle.style.top = (y * 100) + '%';
+                    this.leverInput = 0.5 - y; // +0.5=full accel, -0.5=full decel
+                    this.leverActive = true;
                 };
-                
-                // Small Static Joystick Fixed
-                nipplejs.create({ 
-                    zone: document.getElementById('joystick-zone'), 
-                    mode: 'static', 
-                    position: {left: '50px', top: '50px'}, // Half of container width/height
+                leverZone.addEventListener('touchstart', handleLever, {passive: false});
+                leverZone.addEventListener('touchmove', handleLever, {passive: false});
+                leverZone.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    leverHandle.style.top = '50%';
+                    this.leverInput = 0;
+                    this.leverActive = false;
+                }, {passive: false});
+
+                // Joystick - semi mode for reliable multi-direction input
+                nipplejs.create({
+                    zone: document.getElementById('joystick-zone'),
+                    mode: 'semi',
+                    catchDistance: 40,
                     color: 'cyan',
-                    size: 60 // 50% smaller
+                    size: 86
                 }).on('move', (e, d) => {
                     this.input.joystick.x = d.vector.x;
-                    this.input.joystick.y = d.vector.y; 
+                    this.input.joystick.y = d.vector.y;
                 }).on('end', () => this.input.joystick = {x:0, y:0});
 
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
@@ -396,6 +427,15 @@
                     return;
                 }
                 const delta = Math.min(this.clock.getDelta(), 0.1);
+
+                // Lever: update thrust (clamped 0~1)
+                if(this.leverInput) {
+                    this.input.thrust = Math.max(0, Math.min(1, this.input.thrust + this.leverInput * delta * 1.5));
+                }
+                if(this.audio.engine) {
+                    if(this.input.thrust > 0.05 && !this.audio.engine.isPlaying) this.audio.engine.play();
+                    if(this.audio.engine.isPlaying) this.audio.engine.setPlaybackRate(0.6 + this.input.thrust);
+                }
 
                 if(this.state.takeoff) {
                     this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.5, 0.03);
@@ -512,7 +552,7 @@
                     const dz = ent.mesh.position.z - this.player.position.z;
                     if(dx*dx + dz*dz < 10000*10000) {
                         const dot = document.createElement('div'); dot.className = 'radar-dot';
-                        dot.style.left = (dx / 10000) * 45 + 45 + 'px'; dot.style.top = (dz / 10000) * 45 + 45 + 'px';
+                        dot.style.left = (dx / 10000) * 65 + 65 + 'px'; dot.style.top = (dz / 10000) * 65 + 65 + 'px';
                         dot.style.backgroundColor = ent.isAlly ? 'var(--ally)' : (ent.name ? 'white' : 'var(--danger)');
                         dots.appendChild(dot);
                     }
