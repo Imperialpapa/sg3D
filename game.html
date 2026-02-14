@@ -48,10 +48,22 @@
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
-        /* Left Control: Joystick - initially visible near radar left */
+        /* Left Control: Joystick zone with always-visible guide */
         #joystick-zone {
             position: absolute; bottom: 20px; width: 130px; height: 130px;
             pointer-events: auto; z-index: 1000; touch-action: none;
+        }
+        #joystick-guide {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; border-radius: 50%;
+            border: 2px solid rgba(0,242,255,0.3);
+            background: radial-gradient(circle, rgba(0,242,255,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        #joystick-guide::after {
+            content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 24px; height: 24px; border-radius: 50%;
+            background: rgba(0,242,255,0.25); border: 1px solid rgba(0,242,255,0.4);
         }
 
         /* Right Controls: Lever above Fire */
@@ -158,7 +170,7 @@
                 <div id="lever-label-dn">DEC</div>
             </div>
         </div>
-        <div id="joystick-zone"></div>
+        <div id="joystick-zone"><div id="joystick-guide"></div></div>
         <div id="fire-btn">FIRE</div>
         <div id="msg-box"></div>
     </div>
@@ -474,15 +486,14 @@
                     this.leverActive = false;
                 }, {passive: false});
 
-                // Joystick - position left of radar center, always visible
+                // Joystick - dynamic mode with always-visible CSS guide
                 const jZone = document.getElementById('joystick-zone');
-                // Place joystick left of radar: radar center is 50%, joystick to its left
-                const radarLeft = window.innerWidth / 2 - 65; // radar left edge
-                jZone.style.left = (radarLeft - 140) + 'px'; // 140px = joystick width + gap
-                this.joystick = nipplejs.create({
+                const radarLeft = window.innerWidth / 2 - 65;
+                jZone.style.left = (radarLeft - 140) + 'px';
+                this.joystickActive = false;
+                nipplejs.create({
                     zone: jZone,
-                    mode: 'static',
-                    position: { left: '65px', top: '65px' },
+                    mode: 'dynamic',
                     color: 'cyan',
                     size: 86
                 }).on('move', (e, d) => {
@@ -490,7 +501,6 @@
                     this.input.joystick.y = d.vector.y;
                     this.joystickActive = true;
                 }).on('end', () => { this.input.joystick = {x:0, y:0}; this.joystickActive = false; });
-                this.joystickActive = false;
 
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
                 document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
