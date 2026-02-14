@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skyline Ace: Flight Fixed</title>
+    <title>Skyline Ace: UI & Control Fixed</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
         :root { --accent: #00f2ff; --danger: #ff4444; --ally: #00ff88; --glass: rgba(0, 0, 0, 0.7); }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Quicksand', sans-serif; touch-action: none; color: white; }
+        
+        /* Screens */
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -29,32 +31,49 @@
             width: 100%; margin-top: 25px; padding: 18px; border-radius: 50px;
             background: #fff; color: #000; border: none; font-weight: 700; cursor: pointer;
         }
+
+        /* HUD */
         #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        .hud-el { position: absolute; padding: 12px; background: var(--glass); border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        .hud-tl { top: 20px; left: 20px; border-left: 4px solid var(--accent); }
-        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 4px solid var(--danger); }
+        .hud-el { position: absolute; padding: 10px; background: var(--glass); border-radius: 10px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        .hud-tl { top: 20px; left: 20px; border-left: 3px solid var(--accent); }
+        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 3px solid var(--danger); }
         .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+        
+        /* Central Radar */
         #radar-ui {
-            position: absolute; bottom: 40px; left: 210px; width: 120px; height: 120px;
-            border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 110px; height: 110px; border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
             background: radial-gradient(circle, rgba(0,40,40,0.6) 0%, rgba(0,10,10,0.8) 100%);
             backdrop-filter: blur(4px);
         }
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 5px currentColor; }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
+
+        /* Right Controls */
         #speed-lever-zone {
-            position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
-            height: 200px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
+            position: absolute; right: 20px; bottom: 140px;
+            height: 100px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
         }
-        #speed-slider { -webkit-appearance: none; width: 180px; height: 4px; background: rgba(255,255,255,0.2); transform: rotate(-90deg); margin-top: 85px; outline: none; }
-        #speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 25px; background: var(--accent); cursor: pointer; border-radius: 5px; box-shadow: 0 0 15px var(--accent); }
-        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; pointer-events: auto; }
+        #speed-slider { 
+            -webkit-appearance: none; width: 90px; height: 4px; background: rgba(255,255,255,0.2); 
+            transform: rotate(-90deg); margin-top: 45px; outline: none; 
+        }
+        #speed-slider::-webkit-slider-thumb { 
+            -webkit-appearance: none; width: 35px; height: 20px; background: var(--accent); 
+            cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px var(--accent); 
+        }
+        
         #fire-btn { 
-            position: absolute; bottom: 60px; right: 120px; width: 80px; height: 80px; 
+            position: absolute; bottom: 40px; right: 20px; width: 85px; height: 85px; 
             border-radius: 50%; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
-            display: flex; justify-content: center; align-items: center; pointer-events: auto; color: white; font-weight: 700;
+            display: flex; justify-content: center; align-items: center; pointer-events: auto; 
+            color: white; font-weight: 700; box-shadow: 0 0 20px rgba(255,0,0,0.2);
         }
-        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 24px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
+
+        /* Left Controls */
+        #joystick-zone { position: absolute; bottom: 40px; left: 20px; width: 120px; height: 120px; pointer-events: auto; }
+
+        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 20px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
     </style>
 </head>
 <body>
@@ -63,14 +82,14 @@
         <div class="card">
             <h1>SKYLINE ACE</h1>
             <div style="text-align:left; margin-bottom:20px;">
-                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">UNIT SELECTION</div>
+                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">UNIT SELECT</div>
                 <div style="display:flex; gap:10px;" id="unit-select">
                     <button class="opt-btn active" data-val="JET">JET FIGHTER</button>
                     <button class="opt-btn" data-val="UFO">X-UFO</button>
                 </div>
             </div>
             <div style="text-align:left; margin-bottom:20px;">
-                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">MISSION DIFFICULTY</div>
+                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">DIFFICULTY</div>
                 <div style="display:flex; gap:6px;" id="diff-select">
                     <button class="opt-btn active" data-val="1">1</button>
                     <button class="opt-btn" data-val="2">2</button>
@@ -87,26 +106,28 @@
         <div class="card">
             <h1 id="over-title">MISSION COMPLETE</h1>
             <div id="over-stats" style="margin:20px 0; font-size:16px;"></div>
-            <button onclick="location.reload()" class="start-btn">RETURN TO BASE</button>
+            <button onclick="location.reload()" class="start-btn">RETRY</button>
         </div>
     </div>
 
     <div id="hud">
         <div class="hud-el hud-tl">
-            <div style="font-size:10px; opacity:0.7;">ALT / SPD</div>
-            <div style="font-size:20px;"><span id="alt-val">0</span> / <span id="spd-val">0</span></div>
+            <div style="font-size:9px; opacity:0.7;">ALT / SPD</div>
+            <div style="font-size:18px;"><span id="alt-val">0</span> / <span id="spd-val">0</span></div>
         </div>
         <div class="hud-el hud-tr">
-            <div style="font-size:10px; opacity:0.7;">KILLS / GOAL</div>
-            <div style="font-size:20px;"><span id="kill-val">0</span> / <span id="target-val">0</span></div>
+            <div style="font-size:9px; opacity:0.7;">KILLS / GOAL</div>
+            <div style="font-size:18px;"><span id="kill-val">0</span> / <span id="target-val">0</span></div>
         </div>
-        <div class="hud-el hud-tm" style="width:120px;">
-            <div style="font-size:10px; opacity:0.7;">REMAINING</div>
-            <div style="font-size:20px; color:var(--danger);" id="timer-val">60</div>
+        <div class="hud-el hud-tm" style="width:110px;">
+            <div style="font-size:9px; opacity:0.7;">TIME</div>
+            <div style="font-size:18px; color:var(--danger);" id="timer-val">60</div>
         </div>
+        
         <div id="radar-ui"><div id="radar-player"></div><div id="radar-dots"></div></div>
+        
         <div id="speed-lever-zone">
-            <div style="font-size:9px; opacity:0.6; margin-bottom:60px;">THRUST</div>
+            <div style="font-size:8px; opacity:0.6; margin-bottom:40px;">THRUST</div>
             <input type="range" id="speed-slider" min="0" max="100" value="0">
         </div>
         <div id="joystick-zone"></div>
@@ -138,7 +159,7 @@
 
             initScene() {
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 80000);
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 80000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -156,11 +177,11 @@
                 this.camera.add(listener);
                 const loader = new THREE.AudioLoader();
                 this.audio.engine = new THREE.Audio(listener);
-                loader.load(SOUNDS.engine, buf => { this.audio.engine.setBuffer(buf); this.audio.engine.setLoop(true); this.audio.engine.setVolume(0.3); });
+                loader.load(SOUNDS.engine, buf => { this.audio.engine.setBuffer(buf); this.audio.engine.setLoop(true); this.audio.engine.setVolume(0.2); });
                 this.audio.laser = new THREE.Audio(listener);
-                loader.load(SOUNDS.laser, buf => { this.audio.laser.setBuffer(buf); this.audio.laser.setVolume(0.4); });
+                loader.load(SOUNDS.laser, buf => { this.audio.laser.setBuffer(buf); this.audio.laser.setVolume(0.3); });
                 this.audio.explosion = new THREE.Audio(listener);
-                loader.load(SOUNDS.explosion, buf => { this.audio.explosion.setBuffer(buf); this.audio.explosion.setVolume(0.6); });
+                loader.load(SOUNDS.explosion, buf => { this.audio.explosion.setBuffer(buf); this.audio.explosion.setVolume(0.5); });
             }
 
             initWorld() {
@@ -168,7 +189,7 @@
                 this.scene.background = new THREE.Color(isDay ? 0x66ccff : 0x050520);
                 this.scene.fog = new THREE.FogExp2(isDay ? 0x99ccff : 0x0a0a2a, 0.0001);
                 this.scene.add(new THREE.AmbientLight(0xffffff, isDay ? 1.0 : 0.6));
-                const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+                const sun = new THREE.DirectionalLight(0xffffff, 1.3);
                 sun.position.set(2000, 3000, -2000);
                 this.scene.add(sun);
                 const ocean = new THREE.Mesh(new THREE.PlaneGeometry(80000, 80000), new THREE.MeshStandardMaterial({ color: 0x003366, metalness: 0.6, roughness: 0.2 }));
@@ -180,13 +201,13 @@
                     const ship = this.createShip();
                     ship.position.set((Math.random()-0.5)*40000, 0, (Math.random()-0.5)*40000);
                     this.scene.add(ship);
-                    this.entities.ships.push({ mesh: ship, speed: 0.2 + Math.random()*0.4 });
+                    this.entities.ships.push({ mesh: ship, speed: 0.2 + Math.random()*0.3 });
                 }
                 for(let i=0; i<6; i++) {
                     const plane = this.createAirliner();
                     plane.position.set((Math.random()-0.5)*60000, 3500 + Math.random()*2500, (Math.random()-0.5)*60000);
                     this.scene.add(plane);
-                    this.entities.airliners.push({ mesh: plane, speed: 2.5 + Math.random()*2.0, trailTimer: 0 });
+                    this.entities.airliners.push({ mesh: plane, speed: 2.5 + Math.random()*1.5, trailTimer: 0 });
                 }
 
                 this.runway = new THREE.Group();
@@ -231,7 +252,7 @@
 
             createAirliner() {
                 const group = new THREE.Group();
-                const mat = new THREE.MeshStandardMaterial({color:0xffffff, emissive: 0x222222});
+                const mat = new THREE.MeshStandardMaterial({color:0xffffff, emissive: 0x111111});
                 const body = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 150, 12), mat);
                 body.rotation.x = Math.PI/2;
                 const wings = new THREE.Mesh(new THREE.BoxGeometry(140, 1.5, 40), mat);
@@ -285,10 +306,9 @@
                 };
                 nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left:'50%', top:'50%'}, color:'cyan' })
                     .on('move', (e, d) => {
-                        // NippleJS Y축: 위로 밀면 음수(-), 아래로 당기면 양수(+)
-                        // Arcade 모드: 위로 밀면 상승하도록 부호 반전
+                        // 직관적인 조작: 밀면 올라가고 당기면 내려감
                         this.input.joystick.x = d.vector.x;
-                        this.input.joystick.y = -d.vector.y; 
+                        this.input.joystick.y = d.vector.y; 
                     })
                     .on('end', () => this.input.joystick = {x:0, y:0});
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
@@ -302,7 +322,7 @@
                 this.state.active = true; this.state.takeoff = true;
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
-                document.getElementById('msg-box').innerText = "MAX THROTTLE TO TAKEOFF!";
+                document.getElementById('msg-box').innerText = "THRUST UP TO TAKEOFF!";
                 for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
                 for(let i=0; i<2; i++) this.spawnUnit(true);
                 this.timerInterval = setInterval(() => {
@@ -321,31 +341,25 @@
                 }
                 const delta = Math.min(this.clock.getDelta(), 0.1);
 
-                // 이륙 시퀀스 점검
                 if(this.state.takeoff) {
                     this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.5, 0.03);
                     this.player.translateZ(-this.speed);
-                    
-                    // 활주로 가속 후 자동 부양
                     if(this.speed > 2.0 && this.player.position.z < 200) {
                         this.player.rotateX(0.4 * delta);
                         if(this.player.position.y > 150) {
                             this.state.takeoff = false;
-                            document.getElementById('msg-box').innerText = "AIRBORNE - MISSION START";
-                            setTimeout(() => document.getElementById('msg-box').innerText = "", 2000);
+                            document.getElementById('msg-box').innerText = "";
                         }
                     }
                 } else {
-                    // 비행 조종 로직 (Arcade 방식: 위로 밀면 상승)
                     const pitch = this.input.joystick.y; 
                     const roll = -this.input.joystick.x;
                     
                     if(Math.abs(pitch) > 0.05 || Math.abs(roll) > 0.05) {
                         this.player.rotateX(pitch * 2.5 * delta);
                         this.player.rotateZ(roll * 3.5 * delta);
-                        this.player.rotateY(-roll * 1.2 * delta); // Coordinated turn
+                        this.player.rotateY(-roll * 1.5 * delta); // Coordinated turn
                     } else {
-                        // 자동 수평 유지
                         const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
                         this.player.quaternion.slerp(targetQuat, 0.04);
                     }
@@ -355,7 +369,7 @@
 
                 this.entities.allies.forEach(al => {
                     const targetPos = this.player.position.clone().add(al.offset.clone().applyQuaternion(this.player.quaternion));
-                    al.mesh.position.lerp(targetPos, 0.07); al.mesh.quaternion.slerp(this.player.quaternion, 0.07);
+                    al.mesh.position.lerp(targetPos, 0.08); al.mesh.quaternion.slerp(this.player.quaternion, 0.08);
                 });
 
                 this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
@@ -385,14 +399,14 @@
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
                 }
 
-                // Radar & Wrap
+                // Radar Update
                 const dots = document.getElementById('radar-dots'); dots.innerHTML = '';
                 [...this.entities.enemies, ...this.entities.allies, ...this.entities.landmarks].forEach(ent => {
                     const dx = ent.mesh.position.x - this.player.position.x;
                     const dz = ent.mesh.position.z - this.player.position.z;
                     if(dx*dx + dz*dz < 10000*10000) {
                         const dot = document.createElement('div'); dot.className = 'radar-dot';
-                        dot.style.left = (dx / 10000) * 60 + 60 + 'px'; dot.style.top = (dz / 10000) * 60 + 60 + 'px';
+                        dot.style.left = (dx / 10000) * 55 + 55 + 'px'; dot.style.top = (dz / 10000) * 55 + 55 + 'px';
                         dot.style.color = ent.isAlly ? 'var(--ally)' : (ent.name ? 'white' : 'var(--danger)');
                         dots.appendChild(dot);
                     }
@@ -401,7 +415,7 @@
                 if(Math.abs(this.player.position.x) > 40000) this.player.position.x *= -0.99;
                 if(Math.abs(this.player.position.z) > 40000) this.player.position.z *= -0.99;
 
-                const camOff = new THREE.Vector3(0, 3.5, 12 + this.speed*2.2).applyQuaternion(this.player.quaternion);
+                const camOff = new THREE.Vector3(0, 3.8, 13 + this.speed*2.5).applyQuaternion(this.player.quaternion);
                 this.camera.position.lerp(this.player.position.clone().add(camOff), 0.15);
                 this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-25).applyQuaternion(this.player.quaternion)));
 
@@ -423,8 +437,8 @@
 
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
-                document.getElementById('over-title').innerText = success ? "MISSION ACCOMPLISHED" : "MISSION FAILED";
-                document.getElementById('over-stats').innerText = `ACE LEVEL ${this.state.difficulty} | CONFIRMED KILLS: ${this.state.kills}`;
+                document.getElementById('over-title').innerText = success ? "MISSION COMPLETE" : "MISSION FAILED";
+                document.getElementById('over-stats').innerText = `ACE LEVEL ${this.state.difficulty} | KILLS: ${this.state.kills}`;
                 document.getElementById('over-screen').style.display = 'flex';
                 if(this.audio.engine) this.audio.engine.stop();
             }
