@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skyline Ace: UI & Control Fixed</title>
+    <title>Skyline Ace: Fixed Controls</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
         :root { --accent: #00f2ff; --danger: #ff4444; --ally: #00ff88; --glass: rgba(0, 0, 0, 0.7); }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Quicksand', sans-serif; touch-action: none; color: white; }
         
-        /* Screens */
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background: radial-gradient(circle at center, rgba(15,35,80,0.95), #000);
-            z-index: 100; transition: opacity 0.8s;
+            z-index: 2000; transition: opacity 0.8s;
         }
         .card {
             background: var(--glass); backdrop-filter: blur(25px);
@@ -33,47 +32,51 @@
         }
 
         /* HUD */
-        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 100; }
         .hud-el { position: absolute; padding: 10px; background: var(--glass); border-radius: 10px; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
-        .hud-tl { top: 20px; left: 20px; border-left: 3px solid var(--accent); }
-        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 3px solid var(--danger); }
-        .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+        .hud-tl { top: 20px; left: 20px; border-left: 4px solid var(--accent); }
+        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 4px solid var(--danger); }
+        .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; width: 110px; }
         
         /* Central Radar */
         #radar-ui {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 110px; height: 110px; border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
+            width: 100px; height: 100px; border-radius: 50%; border: 1px solid rgba(0,242,255,0.3);
             background: radial-gradient(circle, rgba(0,40,40,0.6) 0%, rgba(0,10,10,0.8) 100%);
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px); pointer-events: none;
         }
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 5px currentColor; }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
+        /* Left Control */
+        #joystick-zone { 
+            position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; 
+            pointer-events: auto; z-index: 1000; touch-action: none;
+        }
+
         /* Right Controls */
         #speed-lever-zone {
-            position: absolute; right: 20px; bottom: 140px;
+            position: absolute; right: 30px; bottom: 130px;
             height: 100px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
+            z-index: 1000;
         }
         #speed-slider { 
             -webkit-appearance: none; width: 90px; height: 4px; background: rgba(255,255,255,0.2); 
             transform: rotate(-90deg); margin-top: 45px; outline: none; 
         }
         #speed-slider::-webkit-slider-thumb { 
-            -webkit-appearance: none; width: 35px; height: 20px; background: var(--accent); 
+            -webkit-appearance: none; width: 30px; height: 20px; background: var(--accent); 
             cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px var(--accent); 
         }
         
         #fire-btn { 
-            position: absolute; bottom: 40px; right: 20px; width: 85px; height: 85px; 
+            position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; 
             border-radius: 50%; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
             display: flex; justify-content: center; align-items: center; pointer-events: auto; 
-            color: white; font-weight: 700; box-shadow: 0 0 20px rgba(255,0,0,0.2);
+            color: white; font-weight: 700; z-index: 1000; touch-action: none;
         }
 
-        /* Left Controls */
-        #joystick-zone { position: absolute; bottom: 40px; left: 20px; width: 120px; height: 120px; pointer-events: auto; }
-
-        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 20px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
+        #msg-box { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); font-size: 20px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; z-index: 100; }
     </style>
 </head>
 <body>
@@ -105,7 +108,7 @@
     <div id="over-screen" class="screen" style="display:none;">
         <div class="card">
             <h1 id="over-title">MISSION COMPLETE</h1>
-            <div id="over-stats" style="margin:20px 0; font-size:16px;"></div>
+            <div id="over-stats" style="margin:15px 0; font-size:16px;"></div>
             <button onclick="location.reload()" class="start-btn">RETRY</button>
         </div>
     </div>
@@ -119,7 +122,7 @@
             <div style="font-size:9px; opacity:0.7;">KILLS / GOAL</div>
             <div style="font-size:18px;"><span id="kill-val">0</span> / <span id="target-val">0</span></div>
         </div>
-        <div class="hud-el hud-tm" style="width:110px;">
+        <div class="hud-el hud-tm">
             <div style="font-size:9px; opacity:0.7;">TIME</div>
             <div style="font-size:18px; color:var(--danger);" id="timer-val">60</div>
         </div>
@@ -304,13 +307,19 @@
                         this.audio.engine.setPlaybackRate(0.6 + this.input.thrust);
                     }
                 };
-                nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left:'50%', top:'50%'}, color:'cyan' })
-                    .on('move', (e, d) => {
-                        // 직관적인 조작: 밀면 올라가고 당기면 내려감
-                        this.input.joystick.x = d.vector.x;
-                        this.input.joystick.y = d.vector.y; 
-                    })
-                    .on('end', () => this.input.joystick = {x:0, y:0});
+                
+                // NippleJS 초기화 고도화
+                nipplejs.create({ 
+                    zone: document.getElementById('joystick-zone'), 
+                    mode: 'static', 
+                    position: {left: '60px', top: '60px'}, // 절대 픽셀 지정
+                    color: 'cyan',
+                    size: 100
+                }).on('move', (e, d) => {
+                    this.input.joystick.x = d.vector.x;
+                    this.input.joystick.y = d.vector.y; 
+                }).on('end', () => this.input.joystick = {x:0, y:0});
+
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
                 document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
             }
@@ -322,7 +331,7 @@
                 this.state.active = true; this.state.takeoff = true;
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
-                document.getElementById('msg-box').innerText = "THRUST UP TO TAKEOFF!";
+                document.getElementById('msg-box').innerText = "FULL THROTTLE FOR TAKEOFF!";
                 for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
                 for(let i=0; i<2; i++) this.spawnUnit(true);
                 this.timerInterval = setInterval(() => {
@@ -352,13 +361,14 @@
                         }
                     }
                 } else {
+                    // 직관적인 조작: 밀면 상승, 당기면 하강
                     const pitch = this.input.joystick.y; 
                     const roll = -this.input.joystick.x;
                     
                     if(Math.abs(pitch) > 0.05 || Math.abs(roll) > 0.05) {
                         this.player.rotateX(pitch * 2.5 * delta);
                         this.player.rotateZ(roll * 3.5 * delta);
-                        this.player.rotateY(-roll * 1.5 * delta); // Coordinated turn
+                        this.player.rotateY(-roll * 1.5 * delta);
                     } else {
                         const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
                         this.player.quaternion.slerp(targetQuat, 0.04);
@@ -406,7 +416,7 @@
                     const dz = ent.mesh.position.z - this.player.position.z;
                     if(dx*dx + dz*dz < 10000*10000) {
                         const dot = document.createElement('div'); dot.className = 'radar-dot';
-                        dot.style.left = (dx / 10000) * 55 + 55 + 'px'; dot.style.top = (dz / 10000) * 55 + 55 + 'px';
+                        dot.style.left = (dx / 10000) * 50 + 50 + 'px'; dot.style.top = (dz / 10000) * 50 + 50 + 'px';
                         dot.style.color = ent.isAlly ? 'var(--ally)' : (ent.name ? 'white' : 'var(--danger)');
                         dots.appendChild(dot);
                     }
