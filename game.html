@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Skyline: Global Strike</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
+        
+        :root { --glass: rgba(255, 255, 255, 0.1); --blur: blur(15px); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Quicksand', sans-serif; touch-action: none; color: white; }
+        
+        /* UI Screens */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(20,40,80,0.8));
+            z-index: 100; transition: opacity 0.5s;
+        }
+        .card {
+            background: var(--glass); backdrop-filter: var(--blur);
+            padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+            text-align: center; width: 85%; max-width: 400px;
+        }
+        h1 { font-weight: 300; letter-spacing: 8px; margin: 0 0 20px; font-size: 2rem; }
+        
+        /* Selection Controls */
+        .select-group { margin: 15px 0; text-align: left; }
+        .label-sm { font-size: 10px; text-transform: uppercase; opacity: 0.7; letter-spacing: 2px; }
+        .options { display: flex; gap: 10px; margin-top: 5px; }
+        .opt-btn {
+            flex: 1; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
+            color: white; border-radius: 10px; cursor: pointer; transition: 0.3s; font-size: 12px;
+        }
+        .opt-btn.active { background: #ff7744; border-color: #ffaa88; font-weight: bold; }
+        
+        .start-btn {
+            width: 100%; margin-top: 20px; padding: 15px; border-radius: 50px;
+            background: white; color: #ff7744; border: none; font-weight: 700;
+            letter-spacing: 3px; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none;
+        }
+        .hud-el { position: absolute; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 12px; backdrop-filter: blur(5px); }
+        .hud-tl { top: 20px; left: 20px; border-left: 3px solid #00f2ff; }
+        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 3px solid #ff4444; }
+        .hud-val { font-size: 20px; font-weight: 300; }
+        
+        /* Radar Placeholder */
+        #radar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 100px; height: 100px; border-radius: 50%; border: 1px solid rgba(0,255,255,0.3);
+            background: rgba(0,40,40,0.4);
+        }
+
+        /* Controls */
+        #mobile-controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
+        #joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; pointer-events: auto; }
+        .m-btn {
+            position: absolute; width: 60px; height: 60px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center; pointer-events: auto;
+        }
+        #fire-btn { bottom: 50px; right: 30px; width: 80px; height: 80px; background: rgba(255,50,50,0.2); }
+        #pause-btn { top: 20px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 10px; }
+
+        @media (max-width: 900px) { #mobile-controls { display: block; } }
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <div class="card">
+            <h1>SKYLINE</h1>
+            <div class="select-group">
+                <div class="label-sm">Select Unit</div>
+                <div class="options" id="unit-select">
+                    <button class="opt-btn active" data-val="JET">F-35 JET</button>
+                    <button class="opt-btn" data-val="UFO">X-UFO</button>
+                </div>
+            </div>
+            <div class="select-group">
+                <div class="label-sm">Difficulty</div>
+                <div class="options" id="diff-select">
+                    <button class="opt-btn active" data-val="1">1</button>
+                    <button class="opt-btn" data-val="2">2</button>
+                    <button class="opt-btn" data-val="3">3</button>
+                    <button class="opt-btn" data-val="4">4</button>
+                    <button class="opt-btn" data-val="5">5</button>
+                </div>
+            </div>
+            <button id="start-btn" class="start-btn">ENGAGE</button>
+            <p style="font-size: 9px; opacity: 0.5; margin-top: 15px; letter-spacing: 1px;">
+                JOYSTICK: FLY | SPACE: FIRE | P: PAUSE | C: CAMERA
+            </p>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="over-screen" class="screen" style="display:none; opacity:0;">
+        <div class="card">
+            <h1 style="color:#ff4444">MISSION END</h1>
+            <div class="hud-val" id="final-score">0</div>
+            <div id="recommendation" style="font-size: 12px; margin: 15px 0; color: #aaa;"></div>
+            <button onclick="location.reload()" class="start-btn">REDEPLOY</button>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-el hud-tl">
+            <div class="label-sm">Alt / Spd</div>
+            <div class="hud-val"><span id="alt-val">0</span> / <span id="spd-val">0</span></div>
+        </div>
+        <div class="hud-el hud-tr">
+            <div class="label-sm">Score</div>
+            <div class="hud-val" id="score-val">0</div>
+        </div>
+        <div id="radar"></div>
+        <div id="pause-indicator" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:30px; letter-spacing:10px;">PAUSED</div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <div id="joystick-zone"></div>
+        <div id="fire-btn" class="m-btn">FIRE</div>
+        <div id="pause-btn" class="m-btn">P</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+        class Game {
+            constructor() {
+                this.state = {
+                    active: false,
+                    paused: false,
+                    unit: 'JET',
+                    difficulty: 1,
+                    score: 0,
+                    time: new Date().getHours()
+                };
+                
+                this.initScene();
+                this.initEnvironment();
+                this.setupUI();
+                
+                this.clock = new THREE.Clock();
+                this.bullets = [];
+                this.enemies = [];
+                this.joystickData = { x: 0, y: 0 };
+                this.keys = {};
+                
+                this.animate();
+            }
+
+            initScene() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 20000);
+                
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                document.body.appendChild(this.renderer.domElement);
+                
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth/window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            initEnvironment() {
+                const hour = this.state.time;
+                const isDay = hour > 6 && hour < 18;
+                
+                // Sky & Light based on time
+                const skyColor = isDay ? 0x4488ff : 0x050510;
+                const fogColor = isDay ? 0xaaccff : 0x000000;
+                
+                this.scene.background = new THREE.Color(skyColor);
+                this.scene.fog = new THREE.FogExp2(fogColor, 0.0005);
+                
+                const ambient = new THREE.AmbientLight(isDay ? 0xffffff : 0x4444ff, isDay ? 0.6 : 0.2);
+                this.scene.add(ambient);
+                
+                const sunMoon = new THREE.DirectionalLight(isDay ? 0xffccaa : 0xaaaaff, isDay ? 1.5 : 0.5);
+                sunMoon.position.set(500, 1000, -1000);
+                this.scene.add(sunMoon);
+
+                // Ground
+                const groundGeo = new THREE.PlaneGeometry(30000, 30000);
+                const groundMat = new THREE.MeshStandardMaterial({ color: isDay ? 0x224433 : 0x051005 });
+                const ground = new THREE.Mesh(groundGeo, groundMat);
+                ground.rotation.x = -Math.PI/2;
+                this.scene.add(ground);
+
+                // Simple Stars for night
+                if (!isDay) {
+                    const starGeo = new THREE.BufferGeometry();
+                    const starCoords = [];
+                    for(let i=0; i<2000; i++) {
+                        starCoords.push((Math.random()-0.5)*10000, 2000+Math.random()*5000, (Math.random()-0.5)*10000);
+                    }
+                    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starCoords, 3));
+                    this.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 2})));
+                }
+            }
+
+            initPlayer() {
+                this.player = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.1 });
+                
+                if (this.state.unit === 'JET') {
+                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.4, 4, 8), mat);
+                    body.rotation.x = -Math.PI/2;
+                    this.player.add(body);
+                    const wings = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 1.5), mat);
+                    wings.position.z = 0.5;
+                    this.player.add(wings);
+                } else {
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 0.6, 16), mat);
+                    this.player.add(body);
+                    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 8, 0, Math.PI*2, 0, Math.PI/2), 
+                        new THREE.MeshStandardMaterial({color: 0x00f2ff, transparent: true, opacity: 0.6}));
+                    dome.position.y = 0.3;
+                    this.player.add(dome);
+                }
+
+                this.scene.add(this.player);
+                this.player.position.set(0, 150, 0);
+                this.speed = 0;
+                this.targetSpeed = 2.0 + (this.state.difficulty * 0.5);
+            }
+
+            setupUI() {
+                const bindSelect = (id, key) => {
+                    document.getElementById(id).querySelectorAll('.opt-btn').forEach(btn => {
+                        btn.onclick = () => {
+                            document.getElementById(id).querySelector('.active').classList.remove('active');
+                            btn.classList.add('active');
+                            this.state[key] = btn.dataset.val;
+                        };
+                    });
+                };
+                bindSelect('unit-select', 'unit');
+                bindSelect('diff-select', 'difficulty');
+
+                document.getElementById('start-btn').onclick = () => this.start();
+                
+                // Keyboard
+                window.addEventListener('keydown', e => {
+                    this.keys[e.code] = true;
+                    if(e.code === 'KeyP') this.togglePause();
+                    if(e.code === 'KeyC') this.isFirstPerson = !this.isFirstPerson;
+                });
+                window.addEventListener('keyup', e => this.keys[e.code] = false);
+
+                // Mobile
+                const jZone = document.getElementById('joystick-zone');
+                nipplejs.create({ zone: jZone, mode: 'static', position: {left:'50%', top:'50%'}, color:'white' })
+                    .on('move', (e, d) => this.joystickData = d.vector)
+                    .on('end', () => this.joystickData = {x:0, y:0});
+
+                document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.firing = true; };
+                document.getElementById('fire-btn').ontouchend = () => this.firing = false;
+                document.getElementById('pause-btn').onclick = () => this.togglePause();
+            }
+
+            start() {
+                this.state.difficulty = parseInt(this.state.difficulty);
+                this.initPlayer();
+                this.state.active = true;
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('hud').style.display = 'block';
+            }
+
+            togglePause() {
+                if(!this.state.active) return;
+                this.state.paused = !this.state.paused;
+                document.getElementById('pause-indicator').style.display = this.state.paused ? 'block' : 'none';
+            }
+
+            gameOver() {
+                this.state.active = false;
+                const rec = this.state.score < 500 ? "Try Difficulty 1 (Beginner)" : 
+                           this.state.score < 2000 ? "Try Difficulty 2 (Intermediate)" : "Excellent! Challenge Level 4-5";
+                document.getElementById('final-score').innerText = this.state.score;
+                document.getElementById('recommendation').innerText = rec;
+                document.getElementById('over-screen').style.display = 'flex';
+                setTimeout(() => document.getElementById('over-screen').style.opacity = '1', 10);
+            }
+
+            fire() {
+                const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({color:0x00f2ff}));
+                bullet.position.copy(this.player.position);
+                bullet.quaternion.copy(this.player.quaternion);
+                this.scene.add(bullet);
+                this.bullets.push({ mesh: bullet, life: 2.0, vel: new THREE.Vector3(0,0,-15).applyQuaternion(this.player.quaternion) });
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (!this.state.active || this.state.paused) {
+                    this.renderer.render(this.scene, this.camera);
+                    return;
+                }
+
+                const delta = this.clock.getDelta();
+                
+                // Movement
+                let pitch = this.joystickData.y || (this.keys['ArrowUp']?1:0) || (this.keys['ArrowDown']?-1:0);
+                let roll = -this.joystickData.x || (this.keys['ArrowLeft']?1:0) || (this.keys['ArrowRight']?-1:0);
+                
+                this.player.rotateX(pitch * 2.5 * delta);
+                this.player.rotateZ(roll * 3.5 * delta);
+                if (Math.abs(roll) < 0.1) this.player.rotation.z *= 0.95;
+
+                this.speed = THREE.MathUtils.lerp(this.speed, this.targetSpeed, 0.05);
+                this.player.translateZ(-this.speed);
+
+                // Combat
+                if ((this.firing || this.keys['Space']) && this.clock.elapsedTime % 0.15 < 0.02) this.fire();
+                
+                this.bullets.forEach((b, i) => {
+                    b.mesh.position.add(b.vel);
+                    b.life -= delta;
+                    if (b.life <= 0) { this.scene.remove(b.mesh); this.bullets.splice(i, 1); }
+                });
+
+                // Camera (Close 3rd Person)
+                if (this.isFirstPerson) {
+                    this.camera.position.copy(this.player.position);
+                    this.camera.quaternion.copy(this.player.quaternion);
+                    this.camera.translateZ(-1.5); this.camera.translateY(0.4);
+                } else {
+                    const offset = new THREE.Vector3(0, 1.8, 6).applyQuaternion(this.player.quaternion);
+                    this.camera.position.lerp(this.player.position.clone().add(offset), 0.2);
+                    this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-15).applyQuaternion(this.player.quaternion)));
+                }
+
+                // Collisions
+                if (this.player.position.y < 1) this.gameOver();
+
+                // HUD
+                document.getElementById('alt-val').innerText = Math.floor(this.player.position.y);
+                document.getElementById('spd-val').innerText = (this.speed * 10).toFixed(1);
+                document.getElementById('score-val').innerText = this.state.score;
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        window.onload = () => new Game();
+    </script>
+</body>
+</html>
