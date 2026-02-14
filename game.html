@@ -3,90 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Skyline: Global Strike</title>
+    <title>Skyline: Ace - Global Takeoff</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;500;700&display=swap');
-        
-        :root { --glass: rgba(255, 255, 255, 0.1); --blur: blur(15px); }
+        :root { --accent: #00f2ff; --danger: #ff4444; --glass: rgba(0, 0, 0, 0.6); }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Quicksand', sans-serif; touch-action: none; color: white; }
-        
-        /* UI Screens */
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(20,40,80,0.8));
-            z-index: 100; transition: opacity 0.5s;
+            background: radial-gradient(circle at center, rgba(15,45,90,0.9), #000);
+            z-index: 100; transition: opacity 0.8s;
         }
         .card {
-            background: var(--glass); backdrop-filter: var(--blur);
-            padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+            background: var(--glass); backdrop-filter: blur(20px);
+            padding: 30px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1);
             text-align: center; width: 85%; max-width: 400px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
         }
         h1 { font-weight: 300; letter-spacing: 8px; margin: 0 0 20px; font-size: 2rem; }
-        
-        /* Selection Controls */
-        .select-group { margin: 15px 0; text-align: left; }
-        .label-sm { font-size: 10px; text-transform: uppercase; opacity: 0.7; letter-spacing: 2px; }
-        .options { display: flex; gap: 10px; margin-top: 5px; }
         .opt-btn {
-            flex: 1; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
-            color: white; border-radius: 10px; cursor: pointer; transition: 0.3s; font-size: 12px;
+            flex: 1; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 10px; cursor: pointer; transition: 0.3s;
         }
-        .opt-btn.active { background: #ff7744; border-color: #ffaa88; font-weight: bold; }
-        
+        .opt-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
         .start-btn {
-            width: 100%; margin-top: 20px; padding: 15px; border-radius: 50px;
-            background: white; color: #ff7744; border: none; font-weight: 700;
-            letter-spacing: 3px; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            width: 100%; margin-top: 25px; padding: 18px; border-radius: 50px;
+            background: #fff; color: #000; border: none; font-weight: 700; cursor: pointer; transition: 0.3s;
         }
-
-        /* HUD */
-        #hud {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; display: none;
+        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
+        .hud-el { position: absolute; padding: 15px; background: var(--glass); border-radius: 12px; backdrop-filter: blur(5px); }
+        .hud-tl { top: 20px; left: 20px; border-left: 4px solid var(--accent); }
+        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 4px solid var(--danger); }
+        .hud-tm { top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+        #speed-lever-zone {
+            position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
+            height: 200px; width: 60px; pointer-events: auto; display: flex; flex-direction: column; align-items: center;
         }
-        .hud-el { position: absolute; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 12px; backdrop-filter: blur(5px); }
-        .hud-tl { top: 20px; left: 20px; border-left: 3px solid #00f2ff; }
-        .hud-tr { top: 20px; right: 20px; text-align: right; border-right: 3px solid #ff4444; }
-        .hud-val { font-size: 20px; font-weight: 300; }
-        
-        /* Radar Placeholder */
-        #radar {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 100px; height: 100px; border-radius: 50%; border: 1px solid rgba(0,255,255,0.3);
-            background: rgba(0,40,40,0.4);
+        #speed-slider { -webkit-appearance: none; width: 180px; height: 4px; background: rgba(255,255,255,0.2); transform: rotate(-90deg); margin-top: 85px; outline: none; }
+        #speed-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 25px; background: var(--accent); cursor: pointer; border-radius: 5px; box-shadow: 0 0 15px var(--accent); }
+        #joystick-zone { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; pointer-events: auto; }
+        #fire-btn { 
+            position: absolute; bottom: 60px; right: 120px; width: 80px; height: 80px; 
+            border-radius: 50%; background: rgba(255,50,50,0.3); border: 2px solid var(--danger);
+            display: flex; justify-content: center; align-items: center; pointer-events: auto; color: white; font-weight: 700;
         }
-
-        /* Controls */
-        #mobile-controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
-        #joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; pointer-events: auto; }
-        .m-btn {
-            position: absolute; width: 60px; height: 60px; border-radius: 50%;
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
-            display: flex; justify-content: center; align-items: center; pointer-events: auto;
-        }
-        #fire-btn { bottom: 50px; right: 30px; width: 80px; height: 80px; background: rgba(255,50,50,0.2); }
-        #pause-btn { top: 20px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 10px; }
-
-        @media (max-width: 900px) { #mobile-controls { display: block; } }
+        #msg-box { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 28px; color: var(--accent); text-shadow: 0 0 15px var(--accent); text-align: center; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <!-- Start Screen -->
     <div id="start-screen" class="screen">
         <div class="card">
-            <h1>SKYLINE</h1>
-            <div class="select-group">
-                <div class="label-sm">Select Unit</div>
-                <div class="options" id="unit-select">
+            <h1>SKYLINE ACE</h1>
+            <div style="text-align:left; margin-bottom:20px;">
+                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">UNIT TYPE</div>
+                <div style="display:flex; gap:10px;" id="unit-select">
                     <button class="opt-btn active" data-val="JET">F-35 JET</button>
                     <button class="opt-btn" data-val="UFO">X-UFO</button>
                 </div>
             </div>
-            <div class="select-group">
-                <div class="label-sm">Difficulty</div>
-                <div class="options" id="diff-select">
+            <div style="text-align:left; margin-bottom:20px;">
+                <div style="font-size:10px; opacity:0.6; letter-spacing:2px; margin-bottom:8px;">DIFFICULTY</div>
+                <div style="display:flex; gap:6px;" id="diff-select">
                     <button class="opt-btn active" data-val="1">1</button>
                     <button class="opt-btn" data-val="2">2</button>
                     <button class="opt-btn" data-val="3">3</button>
@@ -94,82 +72,75 @@
                     <button class="opt-btn" data-val="5">5</button>
                 </div>
             </div>
-            <button id="start-btn" class="start-btn">ENGAGE</button>
-            <p style="font-size: 9px; opacity: 0.5; margin-top: 15px; letter-spacing: 1px;">
-                JOYSTICK: FLY | SPACE: FIRE | P: PAUSE | C: CAMERA
-            </p>
+            <button id="start-btn" class="start-btn">ENGAGE MISSION</button>
         </div>
     </div>
 
-    <!-- Game Over Screen -->
-    <div id="over-screen" class="screen" style="display:none; opacity:0;">
+    <div id="over-screen" class="screen" style="display:none;">
         <div class="card">
-            <h1 style="color:#ff4444">MISSION END</h1>
-            <div class="hud-val" id="final-score">0</div>
-            <div id="recommendation" style="font-size: 12px; margin: 15px 0; color: #aaa;"></div>
+            <h1 id="over-title" style="letter-spacing:5px;">MISSION COMPLETE</h1>
+            <div id="over-stats" style="margin:20px 0; font-size:16px; opacity:0.8;"></div>
             <button onclick="location.reload()" class="start-btn">REDEPLOY</button>
         </div>
     </div>
 
-    <!-- HUD -->
     <div id="hud">
         <div class="hud-el hud-tl">
-            <div class="label-sm">Alt / Spd</div>
-            <div class="hud-val"><span id="alt-val">0</span> / <span id="spd-val">0</span></div>
+            <div style="font-size:10px; opacity:0.7; letter-spacing:1px;">ALT / SPD</div>
+            <div style="font-size:22px; font-weight:300;"><span id="alt-val">0</span> / <span id="spd-val">0</span></div>
         </div>
         <div class="hud-el hud-tr">
-            <div class="label-sm">Score</div>
-            <div class="hud-val" id="score-val">0</div>
+            <div style="font-size:10px; opacity:0.7; letter-spacing:1px;">KILLS / GOAL</div>
+            <div style="font-size:22px; font-weight:300;"><span id="kill-val">0</span> / <span id="target-val">0</span></div>
         </div>
-        <div id="radar"></div>
-        <div id="pause-indicator" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:30px; letter-spacing:10px;">PAUSED</div>
-    </div>
-
-    <!-- Mobile Controls -->
-    <div id="mobile-controls">
+        <div class="hud-el hud-tm" style="width:140px;">
+            <div style="font-size:10px; opacity:0.7; letter-spacing:1px;">TIME REMAINING</div>
+            <div style="font-size:22px; font-weight:300; color:var(--danger);" id="timer-val">60</div>
+        </div>
+        <div id="speed-lever-zone">
+            <div style="font-size:9px; opacity:0.6; margin-bottom:60px;">THRUST</div>
+            <input type="range" id="speed-slider" min="0" max="100" value="0">
+        </div>
         <div id="joystick-zone"></div>
-        <div id="fire-btn" class="m-btn">FIRE</div>
-        <div id="pause-btn" class="m-btn">P</div>
+        <div id="fire-btn">FIRE</div>
+        <div id="msg-box"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
     <script type="module">
         import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
+        const SOUNDS = {
+            engine: 'https://actions.google.com/sounds/v1/transportation/jet_plane_flying_loop.ogg',
+            laser: 'https://actions.google.com/sounds/v1/science_fiction/low_laser_shot.ogg',
+            explosion: 'https://actions.google.com/sounds/v1/explosions/distant_explosion.ogg',
+            bgm: 'https://actions.google.com/sounds/v1/ambiences/industrial_hum.ogg'
+        };
+
         class Game {
             constructor() {
-                this.state = {
-                    active: false,
-                    paused: false,
-                    unit: 'JET',
-                    difficulty: 1,
-                    score: 0,
-                    time: new Date().getHours()
+                this.state = { 
+                    active: false, takeoff: false, paused: false, unit: 'JET', 
+                    difficulty: 1, kills: 0, targetKills: 10, timeLeft: 60 
                 };
+                this.input = { joystick: {x:0, y:0}, thrust: 0, firing: false };
+                this.entities = { player: null, allies: [], enemies: [], bullets: [], particles: [] };
+                this.audio = {};
                 
                 this.initScene();
-                this.initEnvironment();
                 this.setupUI();
-                
                 this.clock = new THREE.Clock();
-                this.bullets = [];
-                this.enemies = [];
-                this.joystickData = { x: 0, y: 0 };
-                this.keys = {};
-                
                 this.animate();
             }
 
             initScene() {
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 20000);
-                
+                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 50000);
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 document.body.appendChild(this.renderer.domElement);
-                
                 window.addEventListener('resize', () => {
                     this.camera.aspect = window.innerWidth/window.innerHeight;
                     this.camera.updateProjectionMatrix();
@@ -177,133 +148,142 @@
                 });
             }
 
-            initEnvironment() {
-                const hour = this.state.time;
-                const isDay = hour > 6 && hour < 18;
-                
-                // Sky & Light based on time
-                const skyColor = isDay ? 0x4488ff : 0x050510;
-                const fogColor = isDay ? 0xaaccff : 0x000000;
-                
-                this.scene.background = new THREE.Color(skyColor);
-                this.scene.fog = new THREE.FogExp2(fogColor, 0.0005);
-                
-                const ambient = new THREE.AmbientLight(isDay ? 0xffffff : 0x4444ff, isDay ? 0.6 : 0.2);
-                this.scene.add(ambient);
-                
-                const sunMoon = new THREE.DirectionalLight(isDay ? 0xffccaa : 0xaaaaff, isDay ? 1.5 : 0.5);
-                sunMoon.position.set(500, 1000, -1000);
-                this.scene.add(sunMoon);
+            initAudio() {
+                const listener = new THREE.AudioListener();
+                this.camera.add(listener);
+                const loader = new THREE.AudioLoader();
 
-                // Ground
-                const groundGeo = new THREE.PlaneGeometry(30000, 30000);
-                const groundMat = new THREE.MeshStandardMaterial({ color: isDay ? 0x224433 : 0x051005 });
-                const ground = new THREE.Mesh(groundGeo, groundMat);
-                ground.rotation.x = -Math.PI/2;
-                this.scene.add(ground);
+                this.audio.engine = new THREE.Audio(listener);
+                loader.load(SOUNDS.engine, buf => { this.audio.engine.setBuffer(buf); this.audio.engine.setLoop(true); this.audio.engine.setVolume(0.3); });
+                
+                this.audio.bgm = new THREE.Audio(listener);
+                loader.load(SOUNDS.bgm, buf => { this.audio.bgm.setBuffer(buf); this.audio.bgm.setLoop(true); this.audio.bgm.setVolume(0.1); this.audio.bgm.play(); });
 
-                // Simple Stars for night
-                if (!isDay) {
-                    const starGeo = new THREE.BufferGeometry();
-                    const starCoords = [];
-                    for(let i=0; i<2000; i++) {
-                        starCoords.push((Math.random()-0.5)*10000, 2000+Math.random()*5000, (Math.random()-0.5)*10000);
-                    }
-                    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starCoords, 3));
-                    this.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 2})));
-                }
+                this.audio.laser = new THREE.Audio(listener);
+                loader.load(SOUNDS.laser, buf => { this.audio.laser.setBuffer(buf); this.audio.laser.setVolume(0.5); });
+
+                this.audio.explosion = new THREE.Audio(listener);
+                loader.load(SOUNDS.explosion, buf => { this.audio.explosion.setBuffer(buf); this.audio.explosion.setVolume(0.8); });
             }
 
-            initPlayer() {
-                this.player = new THREE.Group();
-                const mat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.1 });
+            initWorld() {
+                const hour = new Date().getHours();
+                const isDay = hour > 6 && hour < 19;
+                this.scene.background = new THREE.Color(isDay ? 0x88ccff : 0x0a0a20);
+                this.scene.fog = new THREE.FogExp2(isDay ? 0xaaccff : 0x000000, 0.0002);
                 
-                if (this.state.unit === 'JET') {
-                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.4, 4, 8), mat);
+                const ambient = new THREE.AmbientLight(0xffffff, isDay ? 1.0 : 0.4);
+                this.scene.add(ambient);
+                const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+                sun.position.set(1000, 2000, -1000);
+                this.scene.add(sun);
+
+                // Ocean & Runway
+                const ocean = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), new THREE.MeshStandardMaterial({ color: 0x003366 }));
+                ocean.rotation.x = -Math.PI/2;
+                this.scene.add(ocean);
+
+                this.runway = new THREE.Group();
+                const deck = new THREE.Mesh(new THREE.BoxGeometry(200, 10, 1500), new THREE.MeshStandardMaterial({color:0x333333}));
+                const strip = new THREE.Mesh(new THREE.PlaneGeometry(10, 1500), new THREE.MeshBasicMaterial({color:0xffff00}));
+                strip.rotation.x = -Math.PI/2; strip.position.y = 5.1;
+                this.runway.add(deck, strip);
+                this.runway.position.set(0, 0, 0);
+                this.scene.add(this.runway);
+
+                this.createEnvironment(isDay);
+            }
+
+            createEnvironment(isDay) {
+                // Instanced Buildings on random islands
+                const bGeo = new THREE.BoxGeometry(1, 1, 1);
+                bGeo.translate(0, 0.5, 0);
+                const bInst = new THREE.InstancedMesh(bGeo, new THREE.MeshStandardMaterial({color: 0x888888}), 800);
+                const dummy = new THREE.Object3D();
+                for(let i=0; i<800; i++) {
+                    dummy.position.set((Math.random()-0.5)*25000, 0, (Math.random()-0.5)*25000);
+                    if(dummy.position.length() < 1000) dummy.position.x += 1500; // Keep runway clear
+                    dummy.scale.set(40+Math.random()*40, 60+Math.random()*400, 40+Math.random()*40);
+                    dummy.updateMatrix(); bInst.setMatrixAt(i, dummy.matrix);
+                }
+                this.scene.add(bInst);
+            }
+
+            createPlayer() {
+                this.player = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
+                if(this.state.unit === 'JET') {
+                    const body = new THREE.Mesh(new THREE.ConeGeometry(0.5, 5, 8), mat);
                     body.rotation.x = -Math.PI/2;
                     this.player.add(body);
-                    const wings = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 1.5), mat);
-                    wings.position.z = 0.5;
-                    this.player.add(wings);
+                    const wings = new THREE.Mesh(new THREE.BoxGeometry(5, 0.1, 2), mat);
+                    wings.position.z = 0.5; this.player.add(wings);
                 } else {
-                    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 0.6, 16), mat);
-                    this.player.add(body);
-                    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 8, 0, Math.PI*2, 0, Math.PI/2), 
-                        new THREE.MeshStandardMaterial({color: 0x00f2ff, transparent: true, opacity: 0.6}));
-                    dome.position.y = 0.3;
-                    this.player.add(dome);
+                    const core = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 0.8, 16), mat);
+                    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({color:0x00f2ff, transparent:true, opacity:0.6}));
+                    dome.position.y = 0.4; this.player.add(core, dome);
                 }
-
                 this.scene.add(this.player);
-                this.player.position.set(0, 150, 0);
+                this.player.position.set(0, 10.1, 500); // Start on runway
                 this.speed = 0;
-                this.targetSpeed = 2.0 + (this.state.difficulty * 0.5);
+            }
+
+            spawnEnemy() {
+                const enemy = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0x441111 });
+                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 5), mat));
+                enemy.add(new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 1.5), mat));
+                enemy.position.set((Math.random()-0.5)*10000, 300+Math.random()*1000, (Math.random()-0.5)*10000);
+                this.scene.add(enemy);
+                this.entities.enemies.push({ mesh: enemy, hp: 2, velocity: new THREE.Vector3(0,0,-2.5).applyQuaternion(enemy.quaternion) });
             }
 
             setupUI() {
-                const bindSelect = (id, key) => {
-                    document.getElementById(id).querySelectorAll('.opt-btn').forEach(btn => {
-                        btn.onclick = () => {
-                            document.getElementById(id).querySelector('.active').classList.remove('active');
-                            btn.classList.add('active');
-                            this.state[key] = btn.dataset.val;
-                        };
-                    });
-                };
-                bindSelect('unit-select', 'unit');
-                bindSelect('diff-select', 'difficulty');
-
-                document.getElementById('start-btn').onclick = () => this.start();
-                
-                // Keyboard
-                window.addEventListener('keydown', e => {
-                    this.keys[e.code] = true;
-                    if(e.code === 'KeyP') this.togglePause();
-                    if(e.code === 'KeyC') this.isFirstPerson = !this.isFirstPerson;
+                const bind = (id, key) => document.getElementById(id).querySelectorAll('.opt-btn').forEach(b => b.onclick = () => {
+                    document.getElementById(id).querySelector('.active').classList.remove('active');
+                    b.classList.add('active'); this.state[key] = b.dataset.val;
                 });
-                window.addEventListener('keyup', e => this.keys[e.code] = false);
-
-                // Mobile
-                const jZone = document.getElementById('joystick-zone');
-                nipplejs.create({ zone: jZone, mode: 'static', position: {left:'50%', top:'50%'}, color:'white' })
-                    .on('move', (e, d) => this.joystickData = d.vector)
-                    .on('end', () => this.joystickData = {x:0, y:0});
-
-                document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.firing = true; };
-                document.getElementById('fire-btn').ontouchend = () => this.firing = false;
-                document.getElementById('pause-btn').onclick = () => this.togglePause();
+                bind('unit-select', 'unit'); bind('diff-select', 'difficulty');
+                document.getElementById('start-btn').onclick = () => this.start();
+                document.getElementById('speed-slider').oninput = (e) => {
+                    this.input.thrust = e.target.value / 100;
+                    if(this.audio.engine && !this.audio.engine.isPlaying) this.audio.engine.play();
+                    if(this.audio.engine) this.audio.engine.setPlaybackRate(0.5 + this.input.thrust);
+                };
+                nipplejs.create({ zone: document.getElementById('joystick-zone'), mode: 'static', position: {left:'50%', top:'50%'}, color:'cyan' })
+                    .on('move', (e, d) => this.input.joystick = d.vector)
+                    .on('end', () => this.input.joystick = {x:0, y:0});
+                document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
+                document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
             }
 
             start() {
                 this.state.difficulty = parseInt(this.state.difficulty);
-                this.initPlayer();
+                this.state.targetKills = 10 * this.state.difficulty;
+                this.initAudio();
+                this.initWorld();
+                this.createPlayer();
                 this.state.active = true;
+                this.state.takeoff = true;
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
+                document.getElementById('msg-box').innerText = "FULL THROTTLE FOR TAKEOFF";
+                
+                for(let i=0; i<this.state.targetKills; i++) this.spawnEnemy();
+                this.timerInterval = setInterval(() => {
+                    if(this.state.active && !this.state.paused) {
+                        this.state.timeLeft--;
+                        if(this.state.timeLeft <= 0) this.gameOver(false);
+                    }
+                }, 1000);
             }
 
-            togglePause() {
-                if(!this.state.active) return;
-                this.state.paused = !this.state.paused;
-                document.getElementById('pause-indicator').style.display = this.state.paused ? 'block' : 'none';
-            }
-
-            gameOver() {
-                this.state.active = false;
-                const rec = this.state.score < 500 ? "Try Difficulty 1 (Beginner)" : 
-                           this.state.score < 2000 ? "Try Difficulty 2 (Intermediate)" : "Excellent! Challenge Level 4-5";
-                document.getElementById('final-score').innerText = this.state.score;
-                document.getElementById('recommendation').innerText = rec;
-                document.getElementById('over-screen').style.display = 'flex';
-                setTimeout(() => document.getElementById('over-screen').style.opacity = '1', 10);
-            }
-
-            fire() {
-                const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({color:0x00f2ff}));
-                bullet.position.copy(this.player.position);
-                bullet.quaternion.copy(this.player.quaternion);
-                this.scene.add(bullet);
-                this.bullets.push({ mesh: bullet, life: 2.0, vel: new THREE.Vector3(0,0,-15).applyQuaternion(this.player.quaternion) });
+            fire(origin) {
+                if(this.audio.laser) { if(this.audio.laser.isPlaying) this.audio.laser.stop(); this.audio.laser.play(); }
+                const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 4), new THREE.MeshBasicMaterial({color:0x00f2ff}));
+                b.position.copy(origin.position); b.quaternion.copy(origin.quaternion);
+                this.scene.add(b);
+                this.entities.bullets.push({ mesh: b, life: 1.5, vel: new THREE.Vector3(0,0,-35).applyQuaternion(origin.quaternion) });
             }
 
             animate() {
@@ -313,48 +293,83 @@
                     return;
                 }
 
-                const delta = this.clock.getDelta();
+                const delta = Math.min(this.clock.getDelta(), 0.1);
                 
-                // Movement
-                let pitch = this.joystickData.y || (this.keys['ArrowUp']?1:0) || (this.keys['ArrowDown']?-1:0);
-                let roll = -this.joystickData.x || (this.keys['ArrowLeft']?1:0) || (this.keys['ArrowRight']?-1:0);
-                
-                this.player.rotateX(pitch * 2.5 * delta);
-                this.player.rotateZ(roll * 3.5 * delta);
-                if (Math.abs(roll) < 0.1) this.player.rotation.z *= 0.95;
-
-                this.speed = THREE.MathUtils.lerp(this.speed, this.targetSpeed, 0.05);
-                this.player.translateZ(-this.speed);
-
-                // Combat
-                if ((this.firing || this.keys['Space']) && this.clock.elapsedTime % 0.15 < 0.02) this.fire();
-                
-                this.bullets.forEach((b, i) => {
-                    b.mesh.position.add(b.vel);
-                    b.life -= delta;
-                    if (b.life <= 0) { this.scene.remove(b.mesh); this.bullets.splice(i, 1); }
-                });
-
-                // Camera (Close 3rd Person)
-                if (this.isFirstPerson) {
-                    this.camera.position.copy(this.player.position);
-                    this.camera.quaternion.copy(this.player.quaternion);
-                    this.camera.translateZ(-1.5); this.camera.translateY(0.4);
+                // Takeoff & Flight Logic
+                if(this.state.takeoff) {
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.0, 0.02);
+                    this.player.translateZ(-this.speed);
+                    if(this.speed > 2.5 && this.player.position.z < -200) {
+                        this.player.rotateX(0.5 * delta); // Lift off
+                        if(this.player.position.y > 100) {
+                            this.state.takeoff = false;
+                            document.getElementById('msg-box').innerText = "CONTROL ACQUIRED";
+                            setTimeout(() => document.getElementById('msg-box').innerText = "", 2000);
+                        }
+                    }
                 } else {
-                    const offset = new THREE.Vector3(0, 1.8, 6).applyQuaternion(this.player.quaternion);
-                    this.camera.position.lerp(this.player.position.clone().add(offset), 0.2);
-                    this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-15).applyQuaternion(this.player.quaternion)));
+                    const steerX = this.input.joystick.y;
+                    const steerZ = -this.input.joystick.x;
+                    if (Math.abs(steerX) < 0.01 && Math.abs(steerZ) < 0.01) {
+                        this.player.rotation.x = THREE.MathUtils.lerp(this.player.rotation.x, 0, 0.03);
+                        this.player.rotation.z = THREE.MathUtils.lerp(this.player.rotation.z, 0, 0.03);
+                    } else {
+                        this.player.rotateX(steerX * 2.5 * delta);
+                        this.player.rotateZ(steerZ * 3.5 * delta);
+                    }
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (5.0 + this.state.difficulty), 0.05);
+                    this.player.translateZ(-this.speed);
                 }
 
-                // Collisions
-                if (this.player.position.y < 1) this.gameOver();
+                // Map Wrap
+                const bnd = 25000;
+                if(Math.abs(this.player.position.x) > bnd) this.player.position.x *= -0.98;
+                if(Math.abs(this.player.position.z) > bnd) this.player.position.z *= -0.98;
 
-                // HUD
+                if(this.input.firing && this.clock.elapsedTime % 0.15 < 0.02) this.fire(this.player);
+
+                // Entities Update
+                for(let i=this.entities.bullets.length-1; i>=0; i--) {
+                    const b = this.entities.bullets[i];
+                    b.mesh.position.add(b.vel); b.life -= delta;
+                    this.entities.enemies.forEach((en, ei) => {
+                        if(b.mesh.position.distanceTo(en.mesh.position) < 30) {
+                            if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                            this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
+                            b.life = 0; this.state.kills++;
+                            if(this.state.kills >= this.state.targetKills) this.gameOver(true);
+                        }
+                    });
+                    if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
+                }
+
+                this.entities.enemies.forEach(en => {
+                    en.mesh.translateZ(-1.5);
+                    if(en.mesh.position.distanceTo(this.player.position) < 2000) en.mesh.lookAt(this.player.position);
+                });
+
+                // Camera
+                const camOffset = new THREE.Vector3(0, 3, 10 + this.speed*2).applyQuaternion(this.player.quaternion);
+                this.camera.position.lerp(this.player.position.clone().add(camOffset), 0.15);
+                this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-20).applyQuaternion(this.player.quaternion)));
+
+                if(!this.state.takeoff && this.player.position.y < 5) this.gameOver(false);
+                
                 document.getElementById('alt-val').innerText = Math.floor(this.player.position.y);
-                document.getElementById('spd-val').innerText = (this.speed * 10).toFixed(1);
-                document.getElementById('score-val').innerText = this.state.score;
+                document.getElementById('spd-val').innerText = (this.speed * 150).toFixed(0);
+                document.getElementById('kill-val').innerText = this.state.kills;
+                document.getElementById('target-val').innerText = this.state.targetKills;
+                document.getElementById('timer-val').innerText = this.state.timeLeft;
 
                 this.renderer.render(this.scene, this.camera);
+            }
+
+            gameOver(success) {
+                this.state.active = false; clearInterval(this.timerInterval);
+                document.getElementById('over-title').innerText = success ? "MISSION ACCOMPLISHED" : "MISSION FAILED";
+                document.getElementById('over-stats').innerText = `Stage: ${this.state.difficulty} | Total Kills: ${this.state.kills}`;
+                document.getElementById('over-screen').style.display = 'flex';
+                if(this.audio.engine) this.audio.engine.stop();
             }
         }
         window.onload = () => new Game();
