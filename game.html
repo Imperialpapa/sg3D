@@ -48,9 +48,9 @@
         .radar-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; transform: translate(-50%, -50%); }
         #radar-player { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
-        /* Left Control: Joystick - 2/3 of radar */
+        /* Left Control: Joystick - initially visible near radar left */
         #joystick-zone {
-            position: absolute; bottom: 15px; left: 15px; width: 130px; height: 130px;
+            position: absolute; bottom: 20px; width: 130px; height: 130px;
             pointer-events: auto; z-index: 1000; touch-action: none;
         }
 
@@ -108,6 +108,19 @@
                     <button class="opt-btn" data-val="3">3</button>
                     <button class="opt-btn" data-val="4">4</button>
                     <button class="opt-btn" data-val="5">5</button>
+                </div>
+            </div>
+            <div id="level-desc" style="text-align:left; margin-bottom:12px; font-size:10px; opacity:0.7; line-height:1.6; padding:8px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:2px solid var(--accent);">
+                Lv1: 10kills, slow, strong auto-aim, HP 8
+            </div>
+            <div style="text-align:left; margin-bottom:12px;">
+                <div style="font-size:9px; opacity:0.6; letter-spacing:2px; margin-bottom:5px;">CONTROLS</div>
+                <div style="font-size:9px; opacity:0.5; line-height:1.8;">
+                    <span style="color:var(--accent);">LEFT</span> Joystick: Pitch &amp; Roll<br>
+                    <span style="color:var(--accent);">RIGHT</span> Lever Up/Down: Accel/Decel<br>
+                    <span style="color:var(--danger);">FIRE</span> Button: Shoot (auto-aim)<br>
+                    <span style="color:white;">AUTO</span> No input = track nearest enemy<br>
+                    <span style="color:white;">P key</span> Pause toggle
                 </div>
             </div>
             <button id="start-btn" class="start-btn">INITIATE</button>
@@ -420,6 +433,20 @@
                     b.classList.add('active'); this.state[key] = b.dataset.val;
                 });
                 bnd('unit-select', 'unit'); bnd('diff-select', 'difficulty');
+
+                // Level descriptions
+                const levelDescs = {
+                    1: 'Lv1: 10kills, slow, strong auto-aim, HP 8',
+                    2: 'Lv2: 20kills, moderate speed, good aim, HP 7',
+                    3: 'Lv3: 30kills, fast, medium aim, HP 6',
+                    4: 'Lv4: 40kills, very fast, weak aim, HP 5',
+                    5: 'Lv5: 50kills, extreme speed, manual aim, HP 4'
+                };
+                const descEl = document.getElementById('level-desc');
+                document.getElementById('diff-select').querySelectorAll('.opt-btn').forEach(b => {
+                    b.addEventListener('click', () => { descEl.textContent = levelDescs[b.dataset.val]; });
+                });
+
                 document.getElementById('start-btn').onclick = () => this.start();
 
                 // Spring-back Lever: up=accelerate, down=decelerate, release=hold speed
@@ -447,17 +474,23 @@
                     this.leverActive = false;
                 }, {passive: false});
 
-                // Joystick - semi mode for reliable multi-direction input
-                nipplejs.create({
-                    zone: document.getElementById('joystick-zone'),
-                    mode: 'semi',
-                    catchDistance: 40,
+                // Joystick - position left of radar center, always visible
+                const jZone = document.getElementById('joystick-zone');
+                // Place joystick left of radar: radar center is 50%, joystick to its left
+                const radarLeft = window.innerWidth / 2 - 65; // radar left edge
+                jZone.style.left = (radarLeft - 140) + 'px'; // 140px = joystick width + gap
+                this.joystick = nipplejs.create({
+                    zone: jZone,
+                    mode: 'static',
+                    position: { left: '65px', top: '65px' },
                     color: 'cyan',
                     size: 86
                 }).on('move', (e, d) => {
                     this.input.joystick.x = d.vector.x;
                     this.input.joystick.y = d.vector.y;
-                }).on('end', () => this.input.joystick = {x:0, y:0});
+                    this.joystickActive = true;
+                }).on('end', () => { this.input.joystick = {x:0, y:0}; this.joystickActive = false; });
+                this.joystickActive = false;
 
                 document.getElementById('fire-btn').ontouchstart = (e) => { e.preventDefault(); this.input.firing = true; };
                 document.getElementById('fire-btn').ontouchend = () => this.input.firing = false;
@@ -478,9 +511,10 @@
                 this.initAudio(); this.initWorld(); this.createPlayer();
                 this.state.active = true; this.state.takeoff = true;
                 this.playerHP = 3 + (6 - this.state.difficulty); // HP: 8 at lv1, 4 at lv5
+                this.input.thrust = 1.0; // auto full thrust for takeoff
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
-                document.getElementById('msg-box').innerText = "FULL THRUST TO TAKEOFF!";
+                document.getElementById('msg-box').innerText = "AUTO TAKEOFF...";
                 for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
                 for(let i=0; i<2; i++) this.spawnUnit(true);
                 this.timerInterval = setInterval(() => {
@@ -509,27 +543,42 @@
                 }
 
                 if(this.state.takeoff) {
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * 4.5, 0.03);
+                    // Auto takeoff: forced full thrust, 2x acceleration (half time)
+                    this.input.thrust = 1.0;
+                    this.speed = THREE.MathUtils.lerp(this.speed, 4.5, 0.06);
                     this.player.translateZ(-this.speed);
-                    if(this.speed > 2.0 && this.player.position.z < 200) {
-                        this.player.rotateX(0.4 * delta);
+                    if(this.speed > 2.0) {
+                        this.player.rotateX(0.8 * delta);
                         if(this.player.position.y > 150) {
                             this.state.takeoff = false;
+                            this.input.thrust = 0.5; // restore to mid after takeoff
                             document.getElementById('msg-box').innerText = "";
                         }
                     }
                 } else {
-                    // Control: Move UP -> Climb, Move DOWN -> Dive
-                    const pitch = this.input.joystick.y; 
+                    const pitch = this.input.joystick.y;
                     const roll = -this.input.joystick.x;
-                    
-                    if(Math.abs(pitch) > 0.05 || Math.abs(roll) > 0.05) {
+
+                    if(this.joystickActive && (Math.abs(pitch) > 0.05 || Math.abs(roll) > 0.05)) {
+                        // Manual control
                         this.player.rotateX(pitch * 2.5 * delta);
                         this.player.rotateZ(roll * 3.5 * delta);
                         this.player.rotateY(-roll * 1.5 * delta);
                     } else {
-                        const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
-                        this.player.quaternion.slerp(targetQuat, 0.04);
+                        // Auto-track nearest enemy when joystick idle
+                        let nearest = null, nearDist = Infinity;
+                        this.entities.enemies.forEach(en => {
+                            const d = en.mesh.position.distanceTo(this.player.position);
+                            if(d < nearDist) { nearDist = d; nearest = en; }
+                        });
+                        if(nearest && nearDist < 15000) {
+                            const toEnemy = nearest.mesh.position.clone().sub(this.player.position).normalize();
+                            const trackQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1), toEnemy);
+                            this.player.quaternion.slerp(trackQuat, 0.02);
+                        } else {
+                            const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
+                            this.player.quaternion.slerp(targetQuat, 0.04);
+                        }
                     }
                     this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (6.0 + this.state.difficulty), 0.05);
                     this.player.translateZ(-this.speed);
