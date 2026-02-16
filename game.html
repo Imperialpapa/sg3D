@@ -327,6 +327,7 @@
                     lfo.start();
                     this.bgmDrone = drone; this.bgmHarm = harm;
                 } catch(e) { /* BGM not supported */ }
+            }
 
             initWorld() {
                 const isDay = new Date().getHours() > 6 && new Date().getHours() < 19;
@@ -932,6 +933,7 @@
                 // Target reticle HUD
                 const reticle = document.getElementById('target-reticle');
                 const reticleInfo = reticle.querySelector('.reticle-info');
+                let canHit = false;
                 if(nearestEnemy && !this.state.takeoff) {
                     // Project enemy position to screen
                     const enemyPos = nearestEnemy.mesh.position.clone();
@@ -944,7 +946,7 @@
                     const dot = fwd.dot(toEn);
                     const onScreen = dot > 0.7 && sx > 0 && sx < window.innerWidth && sy > 0 && sy < window.innerHeight;
                     // Check if aimed well enough to hit (angle < 15 degrees)
-                    const canHit = dot > 0.96 && nearestDist < 3000;
+                    canHit = dot > 0.96 && nearestDist < 3000;
 
                     if(canHit && !this.wasLocked) {
                         if(this.audio.lockon) { if(this.audio.lockon.isPlaying) this.audio.lockon.stop(); this.audio.lockon.play(); }
