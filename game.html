@@ -127,6 +127,11 @@
         @keyframes reticle-spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 
         #msg-box { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font-size: 18px; color: var(--accent); text-align: center; pointer-events: none; width: 100%; }
+        #damage-flash { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.35); pointer-events:none; opacity:0; transition:opacity 0.3s; z-index:90; }
+        #damage-vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity:0; z-index:89;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(255,0,0,0.5) 100%); transition:opacity 0.5s; }
+        #combo-text { position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%); font-size: 28px; font-weight:700;
+            pointer-events:none; z-index:160; opacity:0; transition: opacity 0.4s, transform 0.4s; text-shadow: 0 0 20px currentColor; letter-spacing:3px; }
     </style>
 </head>
 <body>
@@ -152,7 +157,7 @@
                 </div>
             </div>
             <div id="level-desc" style="text-align:left; margin-bottom:12px; font-size:10px; opacity:0.7; line-height:1.6; padding:8px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:2px solid var(--accent);">
-                Lv1: 10kills, slow, strong auto-aim, HP 8
+                Lv1: 5kills | Easy | strong auto-aim | HP 15
             </div>
             <div style="text-align:left; margin-bottom:12px;">
                 <div style="font-size:9px; opacity:0.6; letter-spacing:2px; margin-bottom:5px;">CONTROLS</div>
@@ -217,6 +222,9 @@
             <div class="reticle-info"></div>
         </div>
         <div id="msg-box"></div>
+        <div id="damage-flash"></div>
+        <div id="damage-vignette"></div>
+        <div id="combo-text"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
@@ -227,8 +235,17 @@
             engine: 'https://actions.google.com/sounds/v1/transportation/jet_plane_flying_loop.ogg',
             laser: 'https://actions.google.com/sounds/v1/science_fiction/low_laser_shot.ogg',
             explosion: 'https://actions.google.com/sounds/v1/explosions/distant_explosion.ogg',
-            lockon: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'
+            lockon: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
+            hit: 'https://actions.google.com/sounds/v1/impacts/metal_impact.ogg'
         };
+        const DIFF = [
+            null,
+            { kills: 5,  hp: 15, maxSpd: 10, enSpd: 1.0, enTurn: 0.012, enFire: 4.0, aim: 0.90, track: 0.05, predict: 2 },
+            { kills: 10, hp: 12, maxSpd: 9,  enSpd: 1.5, enTurn: 0.020, enFire: 3.0, aim: 0.70, track: 0.035, predict: 4 },
+            { kills: 20, hp: 8,  maxSpd: 8,  enSpd: 2.5, enTurn: 0.030, enFire: 2.0, aim: 0.45, track: 0.025, predict: 7 },
+            { kills: 35, hp: 5,  maxSpd: 8,  enSpd: 3.2, enTurn: 0.045, enFire: 1.2, aim: 0.20, track: 0.015, predict: 10 },
+            { kills: 50, hp: 3,  maxSpd: 7,  enSpd: 4.0, enTurn: 0.065, enFire: 0.7, aim: 0.05, track: 0.01,  predict: 12 },
+        ];
 
         class Game {
             constructor() {
@@ -270,7 +287,46 @@
                 loader.load(SOUNDS.explosion, buf => { this.audio.explosion.setBuffer(buf); this.audio.explosion.setVolume(0.5); });
                 this.audio.lockon = new THREE.Audio(listener);
                 loader.load(SOUNDS.lockon, buf => { this.audio.lockon.setBuffer(buf); this.audio.lockon.setVolume(0.4); });
+                this.audio.hit = new THREE.Audio(listener);
+                loader.load(SOUNDS.hit, buf => { this.audio.hit.setBuffer(buf); this.audio.hit.setVolume(0.5); });
+                // BGM via Web Audio API
+                this.initBGM();
             }
+
+            initBGM() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.bgmCtx = ctx;
+                    const masterGain = ctx.createGain();
+                    masterGain.gain.value = 0.08;
+                    masterGain.connect(ctx.destination);
+                    this.bgmGain = masterGain;
+                    // Ambient drone
+                    const drone = ctx.createOscillator();
+                    drone.type = 'sine'; drone.frequency.value = 55;
+                    const droneGain = ctx.createGain(); droneGain.gain.value = 0.6;
+                    drone.connect(droneGain); droneGain.connect(masterGain);
+                    drone.start();
+                    // Harmonic layer
+                    const harm = ctx.createOscillator();
+                    harm.type = 'triangle'; harm.frequency.value = 110;
+                    const harmGain = ctx.createGain(); harmGain.gain.value = 0.3;
+                    harm.connect(harmGain); harmGain.connect(masterGain);
+                    harm.start();
+                    // Sub bass pulse
+                    const sub = ctx.createOscillator();
+                    sub.type = 'sine'; sub.frequency.value = 36.7;
+                    const subGain = ctx.createGain(); subGain.gain.value = 0.4;
+                    sub.connect(subGain); subGain.connect(masterGain);
+                    sub.start();
+                    // LFO for tension modulation
+                    const lfo = ctx.createOscillator();
+                    lfo.type = 'sine'; lfo.frequency.value = 0.15;
+                    const lfoGain = ctx.createGain(); lfoGain.gain.value = 15;
+                    lfo.connect(lfoGain); lfoGain.connect(harm.frequency);
+                    lfo.start();
+                    this.bgmDrone = drone; this.bgmHarm = harm;
+                } catch(e) { /* BGM not supported */ }
 
             initWorld() {
                 const isDay = new Date().getHours() > 6 && new Date().getHours() < 19;
@@ -573,7 +629,7 @@
                 const aiType = Math.floor(Math.random()*3);
                 const data = { mesh: unit, isAlly, hp: 3, aiType, phase: 0, phaseTimer: 0,
                     offset: new THREE.Vector3((Math.random()-0.5)*120, (Math.random()-0.5)*60, 60 + Math.random()*60),
-                    baseSpeed: 1.5 + this.state.difficulty * 0.5 };
+                    baseSpeed: this.diff.enSpd };
                 if(isAlly) this.entities.allies.push(data); else this.entities.enemies.push(data);
             }
 
@@ -586,11 +642,11 @@
 
                 // Level descriptions
                 const levelDescs = {
-                    1: 'Lv1: 10kills, slow, strong auto-aim, HP 8',
-                    2: 'Lv2: 20kills, moderate speed, good aim, HP 7',
-                    3: 'Lv3: 30kills, fast, medium aim, HP 6',
-                    4: 'Lv4: 40kills, very fast, weak aim, HP 5',
-                    5: 'Lv5: 50kills, extreme speed, manual aim, HP 4'
+                    1: 'Lv1: 5kills | Easy | strong auto-aim | HP 15',
+                    2: 'Lv2: 10kills | Normal | good aim | HP 12',
+                    3: 'Lv3: 20kills | Hard | medium aim | HP 8',
+                    4: 'Lv4: 35kills | Expert | weak aim | HP 5',
+                    5: 'Lv5: 50kills | ACE | manual aim | HP 3'
                 };
                 const descEl = document.getElementById('level-desc');
                 document.getElementById('diff-select').querySelectorAll('.opt-btn').forEach(b => {
@@ -665,11 +721,13 @@
 
             start() {
                 this.state.difficulty = parseInt(this.state.difficulty);
-                this.state.targetKills = 10 * this.state.difficulty;
+                this.diff = DIFF[this.state.difficulty];
+                this.state.targetKills = this.diff.kills;
                 this.initAudio(); this.initWorld(); this.createPlayer();
                 this.state.active = true; this.state.takeoff = true;
-                this.playerHP = 3 + (6 - this.state.difficulty); // HP: 8 at lv1, 4 at lv5
+                this.playerHP = this.diff.hp;
                 this.maxHP = this.playerHP;
+                this.combo = { count: 0, timer: 0, display: 0 };
                 this.input.thrust = 1.0; // auto full thrust for takeoff
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
@@ -734,13 +792,13 @@
                         if(nearest && nearDist < 15000) {
                             const toEnemy = nearest.mesh.position.clone().sub(this.player.position).normalize();
                             const trackQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1), toEnemy);
-                            this.player.quaternion.slerp(trackQuat, 0.02);
+                            this.player.quaternion.slerp(trackQuat, this.diff.track);
                         } else {
                             const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.player.rotation.y, 0));
                             this.player.quaternion.slerp(targetQuat, 0.04);
                         }
                     }
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * (6.0 + this.state.difficulty), 0.05);
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * this.diff.maxSpd, 0.05);
                     this.player.translateZ(-this.speed);
                 }
 
@@ -780,7 +838,7 @@
                     const dirN = toPlayer.clone().normalize();
                     en.phaseTimer = (en.phaseTimer || 0) + delta;
                     const spd = en.baseSpeed * delta * 60;
-                    const turnRate = 0.025 + this.state.difficulty * 0.008;
+                    const turnRate = this.diff.enTurn;
 
                     if(en.aiType === 0) {
                         // CHASER: direct pursuit, break off at close range then loop back
@@ -830,7 +888,7 @@
                     if(!en.fireTimer) en.fireTimer = Math.random() * 2;
                     en.fireTimer -= delta;
                     if(en.fireTimer <= 0 && dist < 3000) {
-                        en.fireTimer = 2.0 - this.state.difficulty * 0.25;
+                        en.fireTimer = this.diff.enFire;
                         // Muzzle flash
                         const flash = new THREE.Mesh(new THREE.SphereGeometry(1.5, 4, 4), new THREE.MeshBasicMaterial({color:0xff6600, transparent:true, opacity:0.9}));
                         flash.position.copy(en.mesh.position); this.scene.add(flash);
@@ -838,11 +896,22 @@
                         // Bullet with lead prediction
                         const eb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 4), new THREE.MeshBasicMaterial({color:0xff4444}));
                         eb.position.copy(en.mesh.position); this.scene.add(eb);
-                        const predict = this.player.position.clone().add(new THREE.Vector3(0,0,-this.speed * 8).applyQuaternion(this.player.quaternion));
+                        const predict = this.player.position.clone().add(new THREE.Vector3(0,0,-this.speed * this.diff.predict).applyQuaternion(this.player.quaternion));
                         const edir = predict.sub(en.mesh.position).normalize().multiplyScalar(45);
                         this.entities.bullets.push({ mesh: eb, life: 1.5, vel: edir, isEnemy: true });
                     }
                 });
+
+                // BGM tension based on nearest enemy distance
+                if(this.bgmGain && this.bgmCtx) {
+                    let minEnemyDist = Infinity;
+                    this.entities.enemies.forEach(en => {
+                        const d = en.mesh.position.distanceTo(this.player.position);
+                        if(d < minEnemyDist) minEnemyDist = d;
+                    });
+                    const tension = minEnemyDist < 3000 ? 0.15 : 0.06;
+                    this.bgmGain.gain.setTargetAtTime(tension, this.bgmCtx.currentTime, 0.3);
+                }
 
                 this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
                 if(this.entities.birds) this.entities.birds.forEach(b => { b.mesh.translateZ(-b.speed); if(b.mesh.position.z < -20000) b.mesh.position.z = 20000; });
@@ -912,7 +981,7 @@
                     this.entities.particles.push({ mesh: mf, vel: new THREE.Vector3(0,0,0), life: 0.08 });
                     // Auto-aim bullet guidance
                     let bulletDir = new THREE.Vector3(0,0,-50).applyQuaternion(this.player.quaternion);
-                    const aimStrength = (6 - this.state.difficulty) * 0.15;
+                    const aimStrength = this.diff.aim;
                     if(nearestEnemy) {
                         const toEnemy = nearestEnemy.mesh.position.clone().sub(this.player.position).normalize().multiplyScalar(50);
                         bulletDir.lerp(toEnemy, aimStrength);
@@ -929,7 +998,14 @@
                                 this.createExplosion(en.mesh.position);
                                 this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
                                 b.life = 0;
-                                if(!b.isAlly) { this.state.kills++; if(this.state.kills >= this.state.targetKills) this.gameOver(true); }
+                                if(!b.isAlly) {
+                                    this.state.kills++;
+                                    // Combo system
+                                    this.combo.count++;
+                                    this.combo.timer = 5.0;
+                                    this.showCombo();
+                                    if(this.state.kills >= this.state.targetKills) this.gameOver(true);
+                                }
                             }
                         });
                     }
@@ -937,10 +1013,15 @@
                     if(b.isEnemy && this.player && b.mesh.position.distanceTo(this.player.position) < 30) {
                         this.createExplosion(this.player.position.clone());
                         if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                        if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
                         b.life = 0;
-                        this.shakeAmount = 3.0; // camera shake on hit
-                        if(!this.playerHP) this.playerHP = 3 + (6 - this.state.difficulty);
+                        this.shakeAmount = 3.0;
+                        if(!this.playerHP) this.playerHP = this.diff.hp;
                         this.playerHP--;
+                        // Red flash on hit
+                        const flash = document.getElementById('damage-flash');
+                        flash.style.opacity = '1';
+                        setTimeout(() => flash.style.opacity = '0', 150);
                         if(this.playerHP <= 0) this.gameOver(false);
                     }
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
@@ -1001,8 +1082,22 @@
                     const p = this.entities.particles[i];
                     p.mesh.position.add(p.vel);
                     p.life -= delta;
-                    p.mesh.material.opacity = Math.max(0, p.life / (p.isSmoke ? 2.5 : 2.0));
+                    if(p.isRing) {
+                        const s = 1 + (0.5 - p.life) * 12;
+                        p.mesh.scale.set(s, s, s);
+                    }
+                    p.mesh.material.opacity = Math.max(0, p.life / (p.isSmoke ? 2.5 : p.isRing ? 0.5 : 2.0));
                     if(p.life <= 0) { this.scene.remove(p.mesh); this.entities.particles.splice(i, 1); }
+                }
+
+                // Combo timer
+                if(this.combo && this.combo.timer > 0) {
+                    this.combo.timer -= delta;
+                    if(this.combo.timer <= 0) this.combo.count = 0;
+                }
+                if(this.combo && this.combo.display > 0) {
+                    this.combo.display -= delta;
+                    if(this.combo.display <= 0) document.getElementById('combo-text').style.opacity = '0';
                 }
 
                 if(!this.state.takeoff && this.player.position.y < 5) this.gameOver(false);
@@ -1013,6 +1108,7 @@
                 const hpFill = document.getElementById('hp-fill');
                 hpFill.style.width = (hpRatio * 100) + '%';
                 hpFill.style.background = hpRatio > 0.5 ? '#00ff88' : hpRatio > 0.25 ? '#ffaa00' : '#ff4444';
+                document.getElementById('damage-vignette').style.opacity = hpRatio < 0.25 ? '1' : hpRatio < 0.5 ? '0.4' : '0';
                 document.getElementById('kill-val').innerText = this.state.kills;
                 document.getElementById('target-val').innerText = this.state.targetKills;
                 const mm = Math.floor(this.state.timeLeft/60); const ss = String(this.state.timeLeft%60).padStart(2,'0');
@@ -1025,6 +1121,13 @@
                 const flash = new THREE.Mesh(new THREE.SphereGeometry(12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 }));
                 flash.position.copy(pos); this.scene.add(flash);
                 this.entities.particles.push({ mesh: flash, vel: new THREE.Vector3(0,0,0), life: 0.15 });
+                // Shockwave ring
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(5, 1.5, 6, 16), new THREE.MeshBasicMaterial({ color: 0xffaa44, transparent: true, opacity: 0.8 }));
+                ring.position.copy(pos); this.scene.add(ring);
+                this.entities.particles.push({ mesh: ring, vel: new THREE.Vector3(0,0,0), life: 0.5, isRing: true });
+                // Camera shake from nearby explosions
+                const camDist = pos.distanceTo(this.camera.position);
+                if(camDist < 500) this.shakeAmount = Math.max(this.shakeAmount || 0, 2.0 * (1 - camDist/500));
                 // Fire + smoke + sparks
                 for(let i=0; i<40; i++) {
                     const r = Math.random();
@@ -1052,10 +1155,26 @@
                 this.entities.particles.push({ mesh: p, vel: new THREE.Vector3(0,0,0), life: 2.0 });
             }
 
+            showCombo() {
+                const ct = document.getElementById('combo-text');
+                const c = this.combo.count;
+                if(c < 2) { ct.textContent = 'KILL!'; ct.style.color = '#ffffff'; }
+                else if(c === 2) { ct.textContent = 'DOUBLE KILL!'; ct.style.color = '#ffdd00'; }
+                else if(c === 3) { ct.textContent = 'TRIPLE KILL!'; ct.style.color = '#ff8800'; }
+                else if(c < 5) { ct.textContent = `${c}x COMBO!`; ct.style.color = '#ff4400'; }
+                else if(c < 10) { ct.textContent = 'RAMPAGE!'; ct.style.color = '#ff0044'; }
+                else { ct.textContent = 'UNSTOPPABLE!'; ct.style.color = '#ffcc00'; }
+                ct.style.opacity = '1';
+                ct.style.transform = 'translate(-50%,-50%) scale(1.2)';
+                setTimeout(() => { ct.style.transform = 'translate(-50%,-50%) scale(1)'; }, 100);
+                this.combo.display = 1.2;
+            }
+
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
                 document.getElementById('target-reticle').style.display = 'none';
-                const score = this.state.kills * 100 * this.state.difficulty + (success ? this.state.timeLeft * 50 : 0);
+                const baseScore = this.state.kills * 100 * this.state.difficulty;
+                const score = baseScore + (success ? this.state.timeLeft * 50 : 0);
                 const ratio = this.state.kills / this.state.targetKills;
                 let recLevel = this.state.difficulty;
                 if(success && ratio >= 1 && this.state.timeLeft > 20) recLevel = Math.min(5, recLevel + 1);
@@ -1085,6 +1204,7 @@
                 }
                 document.getElementById('over-screen').style.display = 'flex';
                 if(this.audio.engine) this.audio.engine.stop();
+                if(this.bgmGain) this.bgmGain.gain.setTargetAtTime(0, this.bgmCtx.currentTime, 0.5);
             }
 
             sortie(level) {
@@ -1096,11 +1216,13 @@
                 this.entities.bullets = []; this.entities.particles = [];
                 // Reset state for new sortie
                 this.state.difficulty = level;
-                this.state.targetKills = 10 * level;
+                this.diff = DIFF[level];
+                this.state.targetKills = this.diff.kills;
                 this.state.kills = 0; this.state.timeLeft = 300;
                 this.state.active = true; this.state.takeoff = true;
-                this.playerHP = 3 + (6 - level);
+                this.playerHP = this.diff.hp;
                 this.maxHP = this.playerHP;
+                this.combo = { count: 0, timer: 0, display: 0 };
                 this.input.thrust = 1.0; this.speed = 0;
                 this.player.position.set(0, 15, 1000);
                 this.player.quaternion.identity();
