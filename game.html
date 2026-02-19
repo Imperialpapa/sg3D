@@ -132,6 +132,8 @@
             background: radial-gradient(ellipse at center, transparent 50%, rgba(255,0,0,0.5) 100%); transition:opacity 0.5s; }
         #combo-text { position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%); font-size: 28px; font-weight:700;
             pointer-events:none; z-index:160; opacity:0; transition: opacity 0.4s, transform 0.4s; text-shadow: 0 0 20px currentColor; letter-spacing:3px; }
+        #powerup-indicator { position:absolute; top:95px; left:15px; pointer-events:none; font-size:10px; letter-spacing:1px; }
+        #powerup-indicator .pu-active { padding:3px 8px; border-radius:4px; margin-bottom:3px; font-weight:700; }
     </style>
 </head>
 <body>
@@ -168,6 +170,10 @@
                     <span style="color:white;">AUTO</span> No input = track nearest enemy<br>
                     <span style="color:white;">P key</span> Pause toggle
                 </div>
+            </div>
+            <div id="top-scores" style="text-align:left; margin-bottom:12px; display:none;">
+                <div style="font-size:9px; opacity:0.6; letter-spacing:2px; margin-bottom:5px;">TOP SCORES</div>
+                <div id="scores-list" style="font-size:10px; opacity:0.6; line-height:1.6; padding:8px; background:rgba(255,255,255,0.03); border-radius:8px; border-left:2px solid #ffdd00; max-height:120px; overflow-y:auto;"></div>
             </div>
             <button id="start-btn" class="start-btn">INITIATE</button>
         </div>
@@ -225,6 +231,7 @@
         <div id="damage-flash"></div>
         <div id="damage-vignette"></div>
         <div id="combo-text"></div>
+        <div id="powerup-indicator"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
@@ -236,7 +243,8 @@
             laser: 'https://actions.google.com/sounds/v1/science_fiction/low_laser_shot.ogg',
             explosion: 'https://actions.google.com/sounds/v1/explosions/distant_explosion.ogg',
             lockon: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
-            hit: 'https://actions.google.com/sounds/v1/impacts/metal_impact.ogg'
+            hit: 'https://actions.google.com/sounds/v1/impacts/metal_impact.ogg',
+            flyby: 'https://actions.google.com/sounds/v1/transportation/jet_flyby.ogg'
         };
         const DIFF = [
             null,
@@ -252,7 +260,7 @@
                 this.state = { active: false, takeoff: false, paused: false, unit: 'JET', difficulty: 1, kills: 0, targetKills: 10, timeLeft: 300 };
                 this.input = { joystick: {x:0, y:0}, thrust: 0.5, firing: false };
                 this.leverInput = 0;
-                this.entities = { player: null, allies: [], enemies: [], bullets: [], ships: [], airliners: [], particles: [], landmarks: [] };
+                this.entities = { player: null, allies: [], enemies: [], bullets: [], ships: [], airliners: [], particles: [], landmarks: [], powerups: [], buildings: [] };
                 this.audio = {};
                 this.initScene();
                 this.setupUI();
@@ -289,6 +297,8 @@
                 loader.load(SOUNDS.lockon, buf => { this.audio.lockon.setBuffer(buf); this.audio.lockon.setVolume(0.4); });
                 this.audio.hit = new THREE.Audio(listener);
                 loader.load(SOUNDS.hit, buf => { this.audio.hit.setBuffer(buf); this.audio.hit.setVolume(0.5); });
+                this.audio.flyby = new THREE.Audio(listener);
+                loader.load(SOUNDS.flyby, buf => { this.audio.flyby.setBuffer(buf); this.audio.flyby.setVolume(0.6); });
                 // BGM via Web Audio API
                 this.initBGM();
             }
@@ -449,8 +459,10 @@
                             emissive: isDay ? 0x000000 : 0x332200,
                             emissiveIntensity: isDay ? 0 : 0.25
                         }));
-                        bld.position.set(cx + (Math.random()-0.5)*600, h/2, cz + (Math.random()-0.5)*600);
+                        const bx = cx + (Math.random()-0.5)*600, bz = cz + (Math.random()-0.5)*600;
+                        bld.position.set(bx, h/2, bz);
                         this.scene.add(bld);
+                        this.entities.buildings.push({ x: bx, z: bz, w: w + 10, h });
                     }
                 }
 
@@ -485,6 +497,7 @@
                 eiffel.position.set(5000, 0, -5000);
                 this.scene.add(eiffel);
                 this.entities.landmarks.push({mesh: eiffel, name: 'EIFFEL'});
+                this.entities.buildings.push({ x: 5000, z: -5000, w: 100, h: 420 });
 
                 const sol = new THREE.Group();
                 sol.add(new THREE.Mesh(new THREE.BoxGeometry(80, 80, 80), new THREE.MeshStandardMaterial({color:0x888888})));
@@ -493,6 +506,7 @@
                 sol.position.set(-10000, 0, 5000);
                 this.scene.add(sol);
                 this.entities.landmarks.push({mesh: sol, name: 'LIBERTY'});
+                this.entities.buildings.push({ x: -10000, z: 5000, w: 80, h: 230 });
             }
 
             createShip(type) {
@@ -628,7 +642,8 @@
                 this.scene.add(unit);
                 // AI behavior type: 0=chaser, 1=flanker, 2=diver
                 const aiType = Math.floor(Math.random()*3);
-                const data = { mesh: unit, isAlly, hp: 3, aiType, phase: 0, phaseTimer: 0,
+                const enHp = isAlly ? 3 : Math.ceil(this.state.difficulty / 2);
+                const data = { mesh: unit, isAlly, hp: enHp, aiType, phase: 0, phaseTimer: 0,
                     offset: new THREE.Vector3((Math.random()-0.5)*120, (Math.random()-0.5)*60, 60 + Math.random()*60),
                     baseSpeed: this.diff.enSpd };
                 if(isAlly) this.entities.allies.push(data); else this.entities.enemies.push(data);
@@ -651,8 +666,9 @@
                 };
                 const descEl = document.getElementById('level-desc');
                 document.getElementById('diff-select').querySelectorAll('.opt-btn').forEach(b => {
-                    b.addEventListener('click', () => { descEl.textContent = levelDescs[b.dataset.val]; });
+                    b.addEventListener('click', () => { descEl.textContent = levelDescs[b.dataset.val]; this.showRanking(parseInt(b.dataset.val)); });
                 });
+                this.showRanking(1);
 
                 document.getElementById('start-btn').onclick = () => this.start();
 
@@ -729,6 +745,10 @@
                 this.playerHP = this.diff.hp;
                 this.maxHP = this.playerHP;
                 this.combo = { count: 0, timer: 0, display: 0 };
+                this.powerupState = { rapid: 0, shield: 0 };
+                this.powerupSpawnTimer = 15;
+                this.flybyCooldown = 0;
+                this.slowmo = null;
                 this.input.thrust = 1.0; // auto full thrust for takeoff
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
@@ -750,7 +770,18 @@
                     this.renderer.render(this.scene, this.camera);
                     return;
                 }
-                const delta = Math.min(this.clock.getDelta(), 0.1);
+                let delta = Math.min(this.clock.getDelta(), 0.1);
+                const realDelta = delta;
+                if(this.slowmo) {
+                    delta *= 0.15;
+                    this.slowmo.timer -= realDelta;
+                    this.slowmo.angle += realDelta * 1.2;
+                    if(this.slowmo.timer <= 0) {
+                        this.slowmo = null;
+                        this.gameOver(true);
+                        return;
+                    }
+                }
 
                 // Lever: update thrust (clamped 0~1)
                 if(this.leverInput) {
@@ -801,6 +832,35 @@
                     }
                     this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * this.diff.maxSpd, 0.05);
                     this.player.translateZ(-this.speed);
+                }
+
+                // Building collision
+                if(!this.state.takeoff) {
+                    if(!this.buildingHitCooldown) this.buildingHitCooldown = 0;
+                    if(this.buildingHitCooldown > 0) this.buildingHitCooldown -= delta;
+                    if(this.buildingHitCooldown <= 0) {
+                        for(const bld of this.entities.buildings) {
+                            const dx = Math.abs(this.player.position.x - bld.x);
+                            const dz = Math.abs(this.player.position.z - bld.z);
+                            const hw = bld.w / 2 + 5;
+                            if(dx < hw && dz < hw && this.player.position.y < bld.h) {
+                                this.playerHP -= 2;
+                                this.shakeAmount = 5.0;
+                                this.buildingHitCooldown = 1.0;
+                                if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
+                                const flash = document.getElementById('damage-flash');
+                                flash.style.opacity = '1';
+                                setTimeout(() => flash.style.opacity = '0', 200);
+                                const pushDir = new THREE.Vector3(
+                                    this.player.position.x - bld.x, Math.max(50, bld.h - this.player.position.y + 50),
+                                    this.player.position.z - bld.z
+                                ).normalize().multiplyScalar(hw * 2);
+                                this.player.position.add(pushDir);
+                                if(this.playerHP <= 0) { this.gameOver(false); return; }
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 this.entities.allies.forEach(al => {
@@ -903,6 +963,18 @@
                     }
                 });
 
+                // Enemy flyby sound
+                if(this.flybyCooldown > 0) this.flybyCooldown -= delta;
+                this.entities.enemies.forEach(en => {
+                    const d = en.mesh.position.distanceTo(this.player.position);
+                    const prev = en._prevDist || d;
+                    en._prevDist = d;
+                    if(prev > 500 && d < 200 && this.flybyCooldown <= 0) {
+                        if(this.audio.flyby) { if(this.audio.flyby.isPlaying) this.audio.flyby.stop(); this.audio.flyby.play(); }
+                        this.flybyCooldown = 1.5;
+                    }
+                });
+
                 // BGM tension based on nearest enemy distance
                 if(this.bgmGain && this.bgmCtx) {
                     let minEnemyDist = Infinity;
@@ -971,7 +1043,8 @@
                 // Fire: manual or auto-fire when locked on (dot>0.96 && dist<3000)
                 const shouldFire = this.input.firing || (this.autoFire && canHit);
                 if(shouldFire && this.fireTimer <= 0) {
-                    this.fireTimer = 0.15;
+                    this.fireTimer = this.powerupState && this.powerupState.rapid > 0 ? 0.07 : 0.15;
+                    if(navigator.vibrate) navigator.vibrate(20);
                     if(this.audio.laser) { if(this.audio.laser.isPlaying) this.audio.laser.stop(); this.audio.laser.play(); }
                     this.fireToggle = !this.fireToggle;
                     const wingOffset = new THREE.Vector3(this.fireToggle ? 3.5 : -3.5, -0.1, -2).applyQuaternion(this.player.quaternion);
@@ -994,37 +1067,49 @@
                 for(let i=this.entities.bullets.length-1; i>=0; i--) {
                     const b = this.entities.bullets[i]; b.mesh.position.add(b.vel); b.life -= delta;
                     if(!b.isEnemy) {
-                        this.entities.enemies.forEach((en, ei) => {
+                        for(let ei = this.entities.enemies.length - 1; ei >= 0; ei--) {
+                            const en = this.entities.enemies[ei];
                             if(b.mesh.position.distanceTo(en.mesh.position) < 60) {
-                                if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
-                                this.createExplosion(en.mesh.position);
-                                this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
+                                en.hp--;
                                 b.life = 0;
-                                if(!b.isAlly) {
-                                    this.state.kills++;
-                                    // Combo system
-                                    this.combo.count++;
-                                    this.combo.timer = 5.0;
-                                    this.showCombo();
-                                    if(this.state.kills >= this.state.targetKills) this.gameOver(true);
+                                if(en.hp <= 0) {
+                                    if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                                    this.createExplosion(en.mesh.position);
+                                    this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
+                                    if(!b.isAlly) {
+                                        this.state.kills++;
+                                        if(navigator.vibrate) navigator.vibrate(50);
+                                        this.combo.count++;
+                                        this.combo.timer = 5.0;
+                                        this.showCombo();
+                                        if(this.state.kills >= this.state.targetKills) {
+                                            this.slowmo = { active: true, timer: 2.5, target: en.mesh.position.clone(), angle: 0 };
+                                        }
+                                    }
+                                } else {
+                                    if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
                                 }
+                                break;
                             }
-                        });
+                        }
                     }
                     // Enemy bullet hits player
                     if(b.isEnemy && this.player && b.mesh.position.distanceTo(this.player.position) < 30) {
-                        this.createExplosion(this.player.position.clone());
-                        if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
-                        if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
                         b.life = 0;
-                        this.shakeAmount = 3.0;
-                        if(!this.playerHP) this.playerHP = this.diff.hp;
-                        this.playerHP--;
-                        // Red flash on hit
-                        const flash = document.getElementById('damage-flash');
-                        flash.style.opacity = '1';
-                        setTimeout(() => flash.style.opacity = '0', 150);
-                        if(this.playerHP <= 0) this.gameOver(false);
+                        if(this.powerupState && this.powerupState.shield > 0) {
+                            // Shield absorbs hit
+                        } else {
+                            this.createExplosion(this.player.position.clone());
+                            if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                            if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
+                            if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                            this.shakeAmount = 3.0;
+                            this.playerHP--;
+                            const flash = document.getElementById('damage-flash');
+                            flash.style.opacity = '1';
+                            setTimeout(() => flash.style.opacity = '0', 150);
+                            if(this.playerHP <= 0) this.gameOver(false);
+                        }
                     }
                     if(b.life <= 0) { this.scene.remove(b.mesh); this.entities.bullets.splice(i, 1); }
                 }
@@ -1078,6 +1163,13 @@
                 const camOff = new THREE.Vector3(0, 3.8, 13 + this.speed*2.5).applyQuaternion(this.player.quaternion);
                 this.camera.position.lerp(this.player.position.clone().add(camOff).add(shakeOff), 0.15);
                 this.camera.lookAt(this.player.position.clone().add(new THREE.Vector3(0,0,-25).applyQuaternion(this.player.quaternion)));
+                // Slowmo killcam camera override
+                if(this.slowmo) {
+                    const t = this.slowmo.target;
+                    const r = 300;
+                    this.camera.position.set(t.x + Math.cos(this.slowmo.angle) * r, t.y + 100, t.z + Math.sin(this.slowmo.angle) * r);
+                    this.camera.lookAt(t);
+                }
 
                 // Particle update
                 for(let i=this.entities.particles.length-1; i>=0; i--) {
@@ -1101,6 +1193,35 @@
                     this.combo.display -= delta;
                     if(this.combo.display <= 0) document.getElementById('combo-text').style.opacity = '0';
                 }
+
+                // Powerup system
+                if(this.powerupSpawnTimer !== undefined) {
+                    this.powerupSpawnTimer -= delta;
+                    if(this.powerupSpawnTimer <= 0) {
+                        this.powerupSpawnTimer = 15;
+                        this.createPowerup();
+                    }
+                }
+                for(let pi = this.entities.powerups.length - 1; pi >= 0; pi--) {
+                    const pu = this.entities.powerups[pi];
+                    pu.mesh.rotation.y += delta * 2;
+                    pu.life -= delta;
+                    if(this.player && pu.mesh.position.distanceTo(this.player.position) < 80) {
+                        if(pu.type === 'heal') this.playerHP = Math.min(this.maxHP, this.playerHP + 3);
+                        else if(pu.type === 'shield') this.powerupState.shield = 8;
+                        else if(pu.type === 'rapid') this.powerupState.rapid = 8;
+                        this.scene.remove(pu.mesh); this.entities.powerups.splice(pi, 1);
+                        continue;
+                    }
+                    if(pu.life <= 0) { this.scene.remove(pu.mesh); this.entities.powerups.splice(pi, 1); }
+                }
+                if(this.powerupState.shield > 0) this.powerupState.shield -= delta;
+                if(this.powerupState.rapid > 0) this.powerupState.rapid -= delta;
+                const puInd = document.getElementById('powerup-indicator');
+                let puHTML = '';
+                if(this.powerupState.shield > 0) puHTML += `<div class="pu-active" style="background:rgba(0,150,255,0.3);color:#00aaff;">SHIELD ${Math.ceil(this.powerupState.shield)}s</div>`;
+                if(this.powerupState.rapid > 0) puHTML += `<div class="pu-active" style="background:rgba(255,200,0,0.3);color:#ffcc00;">RAPID ${Math.ceil(this.powerupState.rapid)}s</div>`;
+                puInd.innerHTML = puHTML;
 
                 if(!this.state.takeoff && this.player.position.y < 5) this.gameOver(false);
 
@@ -1157,6 +1278,22 @@
                 this.entities.particles.push({ mesh: p, vel: new THREE.Vector3(0,0,0), life: 2.0 });
             }
 
+            createPowerup() {
+                const types = ['heal', 'shield', 'rapid'];
+                const colors = { heal: 0x00ff88, shield: 0x0088ff, rapid: 0xffcc00 };
+                const type = types[Math.floor(Math.random() * types.length)];
+                const group = new THREE.Group();
+                const core = new THREE.Mesh(new THREE.OctahedronGeometry(8, 0), new THREE.MeshStandardMaterial({ color: colors[type], emissive: colors[type], emissiveIntensity: 0.6 }));
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(12, 1, 6, 16), new THREE.MeshBasicMaterial({ color: colors[type], transparent: true, opacity: 0.5 }));
+                group.add(core, ring);
+                const px = this.player.position.x + (Math.random() - 0.5) * 4000;
+                const pz = this.player.position.z + (Math.random() - 0.5) * 4000;
+                const py = 300 + Math.random() * 1200;
+                group.position.set(px, py, pz);
+                this.scene.add(group);
+                this.entities.powerups.push({ mesh: group, type, life: 20 });
+            }
+
             showCombo() {
                 const ct = document.getElementById('combo-text');
                 const c = this.combo.count;
@@ -1172,11 +1309,33 @@
                 this.combo.display = 1.2;
             }
 
+            saveRanking(level, score) {
+                const key = 'skyline_scores_lv' + level;
+                let scores = JSON.parse(localStorage.getItem(key) || '[]');
+                scores.push({ score, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                scores = scores.slice(0, 10);
+                localStorage.setItem(key, JSON.stringify(scores));
+            }
+
+            showRanking(level) {
+                const key = 'skyline_scores_lv' + level;
+                const scores = JSON.parse(localStorage.getItem(key) || '[]');
+                const container = document.getElementById('top-scores');
+                const list = document.getElementById('scores-list');
+                if(scores.length === 0) { container.style.display = 'none'; return; }
+                container.style.display = 'block';
+                list.innerHTML = scores.map((s, i) =>
+                    `<div style="display:flex;justify-content:space-between;"><span style="color:${i < 3 ? '#ffdd00' : 'inherit'};">#${i+1}</span><span>${s.score.toLocaleString()}</span><span style="opacity:0.5;">${s.date}</span></div>`
+                ).join('');
+            }
+
             gameOver(success) {
                 this.state.active = false; clearInterval(this.timerInterval);
                 document.getElementById('target-reticle').style.display = 'none';
                 const baseScore = this.state.kills * 100 * this.state.difficulty;
                 const score = baseScore + (success ? this.state.timeLeft * 50 : 0);
+                this.saveRanking(this.state.difficulty, score);
                 const ratio = this.state.kills / this.state.targetKills;
                 let recLevel = this.state.difficulty;
                 if(success && ratio >= 1 && this.state.timeLeft > 20) recLevel = Math.min(5, recLevel + 1);
@@ -1225,6 +1384,11 @@
                 this.playerHP = this.diff.hp;
                 this.maxHP = this.playerHP;
                 this.combo = { count: 0, timer: 0, display: 0 };
+                this.powerupState = { rapid: 0, shield: 0 };
+                this.powerupSpawnTimer = 15;
+                this.slowmo = null;
+                this.entities.powerups.forEach(p => this.scene.remove(p.mesh));
+                this.entities.powerups = [];
                 this.input.thrust = 1.0; this.speed = 0;
                 this.player.position.set(0, 15, 1000);
                 this.player.quaternion.identity();
