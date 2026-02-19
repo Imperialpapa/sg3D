@@ -134,6 +134,44 @@
             pointer-events:none; z-index:160; opacity:0; transition: opacity 0.4s, transform 0.4s; text-shadow: 0 0 20px currentColor; letter-spacing:3px; }
         #powerup-indicator { position:absolute; top:95px; left:15px; pointer-events:none; font-size:10px; letter-spacing:1px; }
         #powerup-indicator .pu-active { padding:3px 8px; border-radius:4px; margin-bottom:3px; font-weight:700; }
+
+        #missile-btn {
+            position: absolute; bottom: 15px; right: 90px; width: 55px; height: 55px;
+            border-radius: 10px; background: rgba(255,150,0,0.2); border: 2px solid #ff9900;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto;
+            color: white; font-weight: 700; z-index: 1000; font-size: 9px;
+            box-shadow: 0 0 10px rgba(255,150,0,0.3);
+        }
+        #missile-btn.cooldown { opacity: 0.4; border-color: rgba(255,150,0,0.3); }
+        #missile-btn .msl-cd { font-size: 7px; opacity: 0.7; }
+        #speed-lines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 88; opacity: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 48%, rgba(255,255,255,0.03) 49%, transparent 50%);
+            transition: opacity 0.3s;
+        }
+        #boost-btn {
+            position: absolute; bottom: 220px; right: 22px; width: 50px; height: 28px;
+            border-radius: 6px; background: rgba(255,150,0,0.08); border: 1px solid rgba(255,150,0,0.3);
+            display: flex; justify-content: center; align-items: center; pointer-events: auto;
+            color: rgba(255,150,0,0.6); font-weight: 700; z-index: 1000; font-size: 8px; letter-spacing: 1px;
+        }
+        #boost-btn.active { background: rgba(255,150,0,0.3); border-color: #ff9900; color: #ff9900; box-shadow: 0 0 10px rgba(255,150,0,0.4); }
+        #boost-btn.cooldown { opacity: 0.3; }
+        #radio-text {
+            position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
+            font-size: 11px; color: #88ff88; pointer-events: none; z-index: 160;
+            text-align: center; letter-spacing: 1px; opacity: 0; transition: opacity 0.3s;
+            text-shadow: 0 0 8px rgba(0,255,0,0.5); font-family: monospace;
+            background: rgba(0,20,0,0.5); padding: 4px 12px; border-radius: 4px;
+            border: 1px solid rgba(0,255,0,0.2); white-space: nowrap;
+        }
+        #wave-text {
+            position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%);
+            font-size: 36px; font-weight: 700; color: var(--accent); pointer-events: none;
+            z-index: 160; opacity: 0; transition: opacity 0.5s, transform 0.5s;
+            text-shadow: 0 0 30px var(--accent); letter-spacing: 6px;
+        }
     </style>
 </head>
 <body>
@@ -232,6 +270,11 @@
         <div id="damage-vignette"></div>
         <div id="combo-text"></div>
         <div id="powerup-indicator"></div>
+        <div id="missile-btn">MSL<div class="msl-cd"></div></div>
+        <div id="speed-lines"></div>
+        <div id="boost-btn">BOOST</div>
+        <div id="radio-text"></div>
+        <div id="wave-text"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
@@ -254,13 +297,21 @@
             { kills: 35, hp: 5,  maxSpd: 8,  enSpd: 3.2, enTurn: 0.045, enFire: 1.2, aim: 0.20, track: 0.015, predict: 10 },
             { kills: 50, hp: 3,  maxSpd: 7,  enSpd: 4.0, enTurn: 0.065, enFire: 0.7, aim: 0.05, track: 0.01,  predict: 12 },
         ];
+        const RADIO = {
+            kill: ["Fox 2, splash one!", "Good kill!", "Target eliminated!", "Enemy down!", "Tango down!"],
+            hit: ["Taking fire!", "We're hit!", "Damage!", "Under attack!"],
+            wave: ["Bogeys on scope!", "Multiple contacts!", "Here they come!", "New wave incoming!"],
+            boss: ["Large hostile detected!", "It's a big one!", "Boss unit on radar!"],
+            bossKill: ["Boss destroyed! Outstanding!", "Big one's down!"],
+            missile: ["Fox 2! Missile away!", "Missile launched!"]
+        };
 
         class Game {
             constructor() {
                 this.state = { active: false, takeoff: false, paused: false, unit: 'JET', difficulty: 1, kills: 0, targetKills: 10, timeLeft: 300 };
                 this.input = { joystick: {x:0, y:0}, thrust: 0.5, firing: false };
                 this.leverInput = 0;
-                this.entities = { player: null, allies: [], enemies: [], bullets: [], ships: [], airliners: [], particles: [], landmarks: [], powerups: [], buildings: [] };
+                this.entities = { player: null, allies: [], enemies: [], bullets: [], missiles: [], ships: [], airliners: [], particles: [], landmarks: [], powerups: [], buildings: [] };
                 this.audio = {};
                 this.initScene();
                 this.setupUI();
@@ -726,6 +777,21 @@
                     afBtn.textContent = this.autoFire ? 'AUTO ON' : 'AUTO';
                 };
 
+                // Missile button
+                document.getElementById('missile-btn').ontouchstart = (e) => {
+                    e.preventDefault();
+                    if(this.state.active && !this.state.paused) this.fireMissile(this._nearestEnemy);
+                };
+
+                // Boost button
+                const boostBtn = document.getElementById('boost-btn');
+                boostBtn.ontouchstart = (e) => {
+                    e.preventDefault();
+                    if(!this.boostState || this.boostState.cooldown > 0 || this.boostState.active) return;
+                    this.boostState.active = true;
+                    boostBtn.classList.add('active');
+                };
+
                 // Pause toggle (P key)
                 window.addEventListener('keydown', (e) => {
                     if(e.key === 'p' || e.key === 'P') {
@@ -749,11 +815,18 @@
                 this.powerupSpawnTimer = 15;
                 this.flybyCooldown = 0;
                 this.slowmo = null;
+                this.missileTimer = 0;
+                this.boostState = { active: false, fuel: 3.0, cooldown: 0 };
+                const waveSize = Math.min(8, Math.max(5, Math.ceil(this.state.targetKills / 6)));
+                this.wave = { num: 1, size: waveSize, restTimer: 0, resting: false };
+                this.bossSpawned = false;
                 this.input.thrust = 1.0; // auto full thrust for takeoff
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'block';
                 document.getElementById('msg-box').innerText = "AUTO TAKEOFF...";
-                for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
+                const firstWave = Math.min(this.state.targetKills, waveSize);
+                for(let i=0; i<firstWave; i++) this.spawnUnit(false);
+                this.showWaveText('WAVE 1');
                 const allyCount = Math.max(2, Math.floor(this.state.targetKills / 5));
                 for(let i=0; i<allyCount; i++) this.spawnUnit(true);
                 this.timerInterval = setInterval(() => {
@@ -790,6 +863,26 @@
                 if(this.audio.engine) {
                     if(this.input.thrust > 0.05 && !this.audio.engine.isPlaying) this.audio.engine.play();
                     if(this.audio.engine.isPlaying) this.audio.engine.setPlaybackRate(0.6 + this.input.thrust);
+                }
+
+                // Boost system
+                if(this.boostState) {
+                    if(this.boostState.active) {
+                        this.boostState.fuel -= delta;
+                        if(this.boostState.fuel <= 0) {
+                            this.boostState.active = false;
+                            this.boostState.cooldown = 10;
+                            document.getElementById('boost-btn').classList.remove('active');
+                            document.getElementById('boost-btn').classList.add('cooldown');
+                        }
+                    }
+                    if(this.boostState.cooldown > 0) {
+                        this.boostState.cooldown -= delta;
+                        if(this.boostState.cooldown <= 0) {
+                            this.boostState.fuel = 3.0;
+                            document.getElementById('boost-btn').classList.remove('cooldown');
+                        }
+                    }
                 }
 
                 if(this.state.takeoff) {
@@ -830,7 +923,8 @@
                             this.player.quaternion.slerp(targetQuat, 0.04);
                         }
                     }
-                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * this.diff.maxSpd, 0.05);
+                    const spdMult = (this.boostState && this.boostState.active) ? 2.0 : 1.0;
+                    this.speed = THREE.MathUtils.lerp(this.speed, this.input.thrust * this.diff.maxSpd * spdMult, 0.05);
                     this.player.translateZ(-this.speed);
                 }
 
@@ -900,6 +994,40 @@
                     en.phaseTimer = (en.phaseTimer || 0) + delta;
                     const spd = en.baseSpeed * delta * 60;
                     const turnRate = this.diff.enTurn;
+
+                    // Boss AI
+                    if(en.isBoss) {
+                        const bossPhase = Math.floor(en.phaseTimer / 4) % 3;
+                        if(bossPhase < 2) {
+                            const perpX = dirN.z; const perpZ = -dirN.x;
+                            const orbitDir = new THREE.Vector3(perpX, dirN.y * 0.2, perpZ).normalize();
+                            if(dist > 3000) orbitDir.lerp(dirN, 0.5);
+                            const tq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1), orbitDir);
+                            en.mesh.quaternion.slerp(tq, turnRate * 0.8);
+                            en.mesh.translateZ(-spd * 0.7);
+                        } else {
+                            const tq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1), dirN);
+                            en.mesh.quaternion.slerp(tq, turnRate * 2);
+                            en.mesh.translateZ(-spd * 2.5);
+                        }
+                        if(!en.fireTimer) en.fireTimer = 0;
+                        en.fireTimer -= delta;
+                        if(en.fireTimer <= 0 && dist < 5000) {
+                            en.fireTimer = this.diff.enFire * 0.5;
+                            for(let fi = -2; fi <= 2; fi++) {
+                                const eb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 6), new THREE.MeshBasicMaterial({color: 0xff6600}));
+                                eb.position.copy(en.mesh.position); this.scene.add(eb);
+                                const spread = new THREE.Vector3(fi * 5, 0, 0).applyQuaternion(en.mesh.quaternion);
+                                const bdir = this.player.position.clone().sub(en.mesh.position).normalize().multiplyScalar(45).add(spread);
+                                this.entities.bullets.push({ mesh: eb, life: 2.0, vel: bdir, isEnemy: true });
+                            }
+                            const mflash = new THREE.Mesh(new THREE.SphereGeometry(3, 4, 4), new THREE.MeshBasicMaterial({color:0xff6600, transparent:true, opacity:0.9}));
+                            mflash.position.copy(en.mesh.position); this.scene.add(mflash);
+                            this.entities.particles.push({ mesh: mflash, vel: new THREE.Vector3(0,0,0), life: 0.15 });
+                        }
+                        if(en.mesh.position.y < 100) en.mesh.position.y = 100;
+                        return;
+                    }
 
                     if(en.aiType === 0) {
                         // CHASER: direct pursuit, break off at close range then loop back
@@ -986,12 +1114,110 @@
                     this.bgmGain.gain.setTargetAtTime(tension, this.bgmCtx.currentTime, 0.3);
                 }
 
+                // Missile update
+                for(let i = this.entities.missiles.length - 1; i >= 0; i--) {
+                    const m = this.entities.missiles[i];
+                    m.life -= delta;
+                    if(m.target && m.target.parent) {
+                        const toTarget = m.target.position.clone().sub(m.mesh.position).normalize();
+                        const curDir = new THREE.Vector3(0, 0, -1).applyQuaternion(m.mesh.quaternion);
+                        const newDir = curDir.lerp(toTarget, 0.08).normalize();
+                        const tq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), newDir);
+                        m.mesh.quaternion.slerp(tq, 0.15);
+                    }
+                    m.mesh.translateZ(-60);
+                    m.trailTimer = (m.trailTimer || 0) + delta;
+                    if(m.trailTimer > 0.03) {
+                        m.trailTimer = 0;
+                        const tp = new THREE.Mesh(new THREE.SphereGeometry(1, 4, 4), new THREE.MeshBasicMaterial({color: 0xff8800, transparent: true, opacity: 0.7}));
+                        tp.position.copy(m.mesh.position); this.scene.add(tp);
+                        this.entities.particles.push({ mesh: tp, vel: new THREE.Vector3(0, 0, 0), life: 0.5 });
+                    }
+                    let mHit = false;
+                    for(let ei = this.entities.enemies.length - 1; ei >= 0; ei--) {
+                        const en = this.entities.enemies[ei];
+                        const hitRange = en.isBoss ? 120 : 80;
+                        if(m.mesh.position.distanceTo(en.mesh.position) < hitRange) {
+                            en.hp -= 3;
+                            if(en.hp <= 0) {
+                                if(this.audio.explosion) { if(this.audio.explosion.isPlaying) this.audio.explosion.stop(); this.audio.explosion.play(); }
+                                this.createExplosion(en.mesh.position);
+                                this.scene.remove(en.mesh); this.entities.enemies.splice(ei, 1);
+                                this.state.kills++;
+                                if(navigator.vibrate) navigator.vibrate(100);
+                                this.combo.count++; this.combo.timer = 5.0; this.showCombo();
+                                this.radioMessage(this.getRandomRadio('kill'));
+                                if(en.isBoss) this.radioMessage("BOSS DOWN!");
+                                if(this.state.kills >= this.state.targetKills) {
+                                    this.slowmo = { active: true, timer: 2.5, target: en.mesh.position.clone(), angle: 0 };
+                                }
+                            } else {
+                                this.createExplosion(m.mesh.position);
+                                if(this.audio.hit) { if(this.audio.hit.isPlaying) this.audio.hit.stop(); this.audio.hit.play(); }
+                            }
+                            mHit = true; break;
+                        }
+                    }
+                    if(mHit || m.life <= 0) {
+                        if(mHit) this.createExplosion(m.mesh.position);
+                        this.scene.remove(m.mesh); this.entities.missiles.splice(i, 1);
+                    }
+                }
+
+                // Wave system
+                if(this.wave && this.entities.enemies.length === 0 && this.state.kills < this.state.targetKills && !this.slowmo) {
+                    if(!this.wave.resting) {
+                        this.wave.resting = true;
+                        this.wave.restTimer = 2.5;
+                        this.radioMessage("Wave cleared! Regroup!");
+                    }
+                    this.wave.restTimer -= delta;
+                    if(this.wave.restTimer <= 0 && this.wave.resting) {
+                        this.wave.resting = false;
+                        this.wave.num++;
+                        const remaining = this.state.targetKills - this.state.kills;
+                        const spawnCount = Math.min(remaining, this.wave.size);
+                        if(remaining <= this.wave.size && !this.bossSpawned) {
+                            this.createBoss();
+                            this.bossSpawned = true;
+                            for(let i = 0; i < spawnCount - 1; i++) this.spawnUnit(false);
+                        } else {
+                            for(let i = 0; i < spawnCount; i++) this.spawnUnit(false);
+                        }
+                        this.showWaveText('WAVE ' + this.wave.num);
+                        this.radioMessage(this.getRandomRadio('wave'));
+                    }
+                }
+
                 this.entities.ships.forEach(s => { s.mesh.translateZ(s.speed); if(s.mesh.position.z > 40000) s.mesh.position.z = -40000; });
                 if(this.entities.birds) this.entities.birds.forEach(b => { b.mesh.translateZ(-b.speed); if(b.mesh.position.z < -20000) b.mesh.position.z = 20000; });
                 this.entities.airliners.forEach(a => { 
                     a.mesh.translateZ(a.speed); if(a.mesh.position.z > 40000) a.mesh.position.z = -40000; 
                     a.trailTimer += delta; if(a.trailTimer > 0.15) { this.createTrail(a.mesh.position.clone().add(new THREE.Vector3(0,0,10))); a.trailTimer = 0; }
                 });
+
+                // Speed effects: FOV and speed lines
+                if(!this.state.takeoff) {
+                    const targetFov = 60 + this.speed * 3 + (this.boostState && this.boostState.active ? 15 : 0);
+                    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 0.1);
+                    this.camera.updateProjectionMatrix();
+                    const speedRatio = this.speed / (this.diff.maxSpd || 10);
+                    document.getElementById('speed-lines').style.opacity = speedRatio > 0.7 ? String((speedRatio - 0.7) * 3) : '0';
+                }
+
+                // Missile cooldown timer
+                if(this.missileTimer > 0) {
+                    this.missileTimer -= delta;
+                    const mslBtn = document.getElementById('missile-btn');
+                    const cdEl = mslBtn.querySelector('.msl-cd');
+                    if(this.missileTimer > 0) {
+                        mslBtn.classList.add('cooldown');
+                        cdEl.textContent = Math.ceil(this.missileTimer) + 's';
+                    } else {
+                        mslBtn.classList.remove('cooldown');
+                        cdEl.textContent = 'RDY';
+                    }
+                }
 
                 // Find nearest enemy for aiming & reticle
                 if(!this.fireTimer) this.fireTimer = 0;
@@ -1039,6 +1265,7 @@
                 } else {
                     reticle.style.display = 'none';
                 }
+                this._nearestEnemy = nearestEnemy;
 
                 // Fire: manual or auto-fire when locked on (dot>0.96 && dist<3000)
                 const shouldFire = this.input.firing || (this.autoFire && canHit);
@@ -1082,6 +1309,8 @@
                                         this.combo.count++;
                                         this.combo.timer = 5.0;
                                         this.showCombo();
+                                        this.radioMessage(this.getRandomRadio('kill'));
+                                        if(en.isBoss) this.radioMessage("BOSS DOWN!");
                                         if(this.state.kills >= this.state.targetKills) {
                                             this.slowmo = { active: true, timer: 2.5, target: en.mesh.position.clone(), angle: 0 };
                                         }
@@ -1105,6 +1334,7 @@
                             if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
                             this.shakeAmount = 3.0;
                             this.playerHP--;
+                            this.radioMessage(this.getRandomRadio('hit'));
                             const flash = document.getElementById('damage-flash');
                             flash.style.opacity = '1';
                             setTimeout(() => flash.style.opacity = '0', 150);
@@ -1309,6 +1539,80 @@
                 this.combo.display = 1.2;
             }
 
+            fireMissile(target) {
+                if(this.missileTimer > 0 || !target) return;
+                this.missileTimer = 6;
+                if(navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                this.radioMessage(this.getRandomRadio('missile'));
+                const m = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 6), new THREE.MeshStandardMaterial({color: 0xcccccc}));
+                body.rotation.x = Math.PI / 2;
+                const nose = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1, 6), new THREE.MeshStandardMaterial({color: 0xff4400}));
+                nose.rotation.x = -Math.PI / 2; nose.position.z = -2.5;
+                const fin1 = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.8), new THREE.MeshStandardMaterial({color: 0x888888}));
+                fin1.position.z = 1.5;
+                const fin2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.5, 0.8), new THREE.MeshStandardMaterial({color: 0x888888}));
+                fin2.position.z = 1.5;
+                m.add(body, nose, fin1, fin2);
+                m.position.copy(this.player.position);
+                m.quaternion.copy(this.player.quaternion);
+                this.scene.add(m);
+                this.entities.missiles.push({ mesh: m, target: target.mesh, life: 5.0, trailTimer: 0 });
+            }
+
+            createBoss() {
+                const boss = new THREE.Group();
+                const mat = new THREE.MeshStandardMaterial({ color: 0x440000, metalness: 0.8, roughness: 0.2 });
+                const accentMat = new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0xff3300, emissiveIntensity: 0.6 });
+                const body = new THREE.Mesh(new THREE.ConeGeometry(2, 18, 8), mat);
+                body.rotation.x = -Math.PI / 2;
+                const wings = new THREE.Mesh(new THREE.BoxGeometry(25, 0.3, 7), mat);
+                wings.position.z = 2;
+                const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 4), mat);
+                tail.position.set(0, 2.5, 7);
+                for(let i = 0; i < 4; i++) {
+                    const eng = new THREE.Mesh(new THREE.ConeGeometry(0.8, 3, 6), new THREE.MeshBasicMaterial({color: 0xff4400, transparent: true, opacity: 0.7}));
+                    eng.rotation.x = -Math.PI / 2; eng.position.set(-8 + i * 5.3, -0.3, 9);
+                    boss.add(eng);
+                }
+                const stripe = new THREE.Mesh(new THREE.BoxGeometry(25, 0.05, 0.5), accentMat);
+                stripe.position.set(0, 0.2, 2);
+                boss.add(body, wings, tail, stripe);
+                const x = this.player.position.x + (Math.random() - 0.5) * 5000;
+                const z = this.player.position.z + (Math.random() - 0.5) * 5000;
+                boss.position.set(x, 800 + Math.random() * 500, z);
+                boss.scale.set(3, 3, 3);
+                this.scene.add(boss);
+                const bossHp = 10 + this.state.difficulty * 5;
+                const data = { mesh: boss, isAlly: false, hp: bossHp, aiType: 0, phase: 0, phaseTimer: 0,
+                    offset: new THREE.Vector3(0, 0, 0), baseSpeed: this.diff.enSpd * 0.7, isBoss: true, fireTimer: 0 };
+                this.entities.enemies.push(data);
+                this.radioMessage(this.getRandomRadio('boss'));
+                this.showWaveText('WARNING: BOSS');
+            }
+
+            radioMessage(text) {
+                const el = document.getElementById('radio-text');
+                el.textContent = '\u25B8 ' + text;
+                el.style.opacity = '1';
+                clearTimeout(this._radioTimeout);
+                this._radioTimeout = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+            }
+
+            getRandomRadio(type) {
+                const msgs = RADIO[type];
+                return msgs[Math.floor(Math.random() * msgs.length)];
+            }
+
+            showWaveText(text) {
+                const el = document.getElementById('wave-text');
+                el.textContent = text;
+                el.style.opacity = '1';
+                el.style.transform = 'translate(-50%,-50%) scale(1.2)';
+                setTimeout(() => { el.style.transform = 'translate(-50%,-50%) scale(1)'; }, 200);
+                setTimeout(() => { el.style.opacity = '0'; }, 2000);
+            }
+
             saveRanking(level, score) {
                 const key = 'skyline_scores_lv' + level;
                 let scores = JSON.parse(localStorage.getItem(key) || '[]');
@@ -1387,12 +1691,21 @@
                 this.powerupState = { rapid: 0, shield: 0 };
                 this.powerupSpawnTimer = 15;
                 this.slowmo = null;
+                this.missileTimer = 0;
+                this.boostState = { active: false, fuel: 3.0, cooldown: 0 };
+                const waveSize = Math.min(8, Math.max(5, Math.ceil(this.state.targetKills / 6)));
+                this.wave = { num: 1, size: waveSize, restTimer: 0, resting: false };
+                this.bossSpawned = false;
                 this.entities.powerups.forEach(p => this.scene.remove(p.mesh));
                 this.entities.powerups = [];
+                this.entities.missiles.forEach(m => this.scene.remove(m.mesh));
+                this.entities.missiles = [];
                 this.input.thrust = 1.0; this.speed = 0;
                 this.player.position.set(0, 15, 1000);
                 this.player.quaternion.identity();
-                for(let i=0; i<this.state.targetKills; i++) this.spawnUnit(false);
+                const firstWave = Math.min(this.state.targetKills, waveSize);
+                for(let i=0; i<firstWave; i++) this.spawnUnit(false);
+                this.showWaveText('WAVE 1');
                 const allyCount = Math.max(2, Math.floor(this.state.targetKills / 5));
                 for(let i=0; i<allyCount; i++) this.spawnUnit(true);
                 document.getElementById('over-screen').style.display = 'none';
